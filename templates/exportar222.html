@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Exportar — ESMA{% endblock %}
+{% block page_title %}Exportar datos a Excel{% endblock %}
+{% block content %}
+<div style="max-width:620px">
+  <div class="card">
+    <div class="card-hd"><h3>Configurar exportación</h3></div>
+    <div class="card-bd">
+      <form id="formExport">
+        <div class="form-group">
+          <label>Tabla a exportar</label>
+          <select class="form-control" id="tabla" name="tabla">
+            <option value="completo">Reporte completo (4 hojas)</option>
+            <option value="combustible">Reportes 360 · Combustible (con semáforo)</option>
+            <option value="horas">Horas diarias</option>
+            <option value="utilizacion">Utilización y combustible</option>
+            <option value="estado">Estado e historial de equipos</option>
+          </select>
+        </div>
+
+        <div id="filtro-fechas" style="margin-top:16px;">
+          <div class="row">
+            <div class="col">
+              <div class="form-group">
+                <label>Fecha inicio (Desde)</label>
+                <input class="form-control" type="date" id="fi" name="fecha_ini" value="{{ hace30 }}">
+              </div>
+            </div>
+            <div class="col">
+              <div class="form-group">
+                <label>Fecha fin (Hasta)</label>
+                <input class="form-control" type="date" id="ff" name="fecha_fin" value="{{ hoy }}">
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-group" style="margin-top:16px">
+          <label>Seleccionar Equipos <span style="font-size:11px;opacity:.6">(Opcional — si no marcas ninguno, se exportan todos)</span></label>
+          
+          <div style="border: 1px solid #ced4da; padding: 12px; height: 180px; overflow-y: auto; border-radius: 4px; background: #fff;">
+            {% for eq in equipos %}
+              <div style="margin-bottom: 6px;">
+                <label style="font-weight: normal; margin: 0; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                  <input type="checkbox" class="equipo-checkbox" value="{{ eq.eco }}"> 
+                  <span>{{ eq.eco }}{% if eq.serie %} — <small class="text-muted">{{ eq.serie }}</small>{% endif %}</span>
+                </label>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        
+        <button type="button" onclick="descargar()" class="btn btn-primary" style="margin-top: 20px; width: 100%;">↓ Generar y Descargar Excel</button>
+      </form>
+    </div>
+  </div>
+  
+  <div class="card" style="margin-top:16px">
+    <div class="card-hd"><h3>Accesos directos rápidos</h3></div>
+    <div class="card-bd" style="display:flex;flex-direction:column;gap:10px">
+      <a href="#" onclick="rango('completo',30)" class="btn btn-secondary">↓ Reporte completo — últimos 30 días (Todos los equipos)</a>
+      <a href="#" onclick="rango('combustible',30)" class="btn btn-secondary">↓ Reportes 360 combustible — últimos 30 días</a>
+      <a href="#" onclick="hoy('horas')" class="btn btn-secondary">↓ Horas de hoy (Todos los equipos)</a>
+    </div>
+  </div>
+</div>
+
+<script>
+function descargar(){
+  const t = document.getElementById('tabla').value;
+  const fi = document.getElementById('fi').value;
+  const ff = document.getElementById('ff').value;
+  
+  // Recolectar solo los checkboxes que el usuario haya marcado
+  const checkboxes = document.querySelectorAll('.equipo-checkbox:checked');
+  const sel = [];
+  checkboxes.forEach(function(cb) {
+      sel.push(cb.value);
+  });
+  
+  let url = '/exportar/excel?tabla=' + t + '&fecha_ini=' + fi + '&fecha_fin=' + ff;
+  
+  // Si hay equipos seleccionados, los unimos con comas y los mandamos en la URL
+  if (sel.length > 0) {
+      url += '&equipos=' + sel.join(',');
+  }
+  
+  window.location = url;
+}
+
+function hoy(tabla){
+  const h = new Date().toISOString().slice(0,10);
+  window.location = '/exportar/excel?tabla=' + tabla + '&fecha_ini=' + h + '&fecha_fin=' + h;
+}
+
+function rango(tabla, dias){
+  const ff = new Date(); 
+  const fi = new Date(); 
+  fi.setDate(ff.getDate() - dias);
+  window.location = '/exportar/excel?tabla=' + tabla + '&fecha_ini=' + fi.toISOString().slice(0,10) + '&fecha_fin=' + ff.toISOString().slice(0,10);
+}
+</script>
+{% endblock %}

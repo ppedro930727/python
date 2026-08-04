@@ -1,0 +1,8 @@
+flask
+flask-socketio
+mysql-connector-python
+openpyxl
+requests
+eventlet
+xhtml2pdf
+qrcode[pil]

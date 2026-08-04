@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Presupuesto — ESMA{% endblock %}
+{% block page_title %}Presupuesto por Obra{% endblock %}
+{% block breadcrumb %}Control Financiero · Presupuesto y códigos de costo{% endblock %}
+{% block topbar_actions %}
+{% if user_perms.get('presupuesto',{}).get('crear') %}
+<a href="{{ url_for('presupuesto_importar') }}" class="btn btn-primary">Importar Presupuesto (Procore)</a>
+{% endif %}
+<a href="{{ url_for('codigos_costo') }}" class="btn btn-secondary">Catálogo de Códigos de Costo</a>
+{% endblock %}
+{% block content %}
+
+<div class="card" style="margin-bottom:16px">
+  <div class="card-bd">
+    <form method="GET" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div style="min-width:260px"><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Obra</label>
+        <select class="form-control" name="obra" onchange="this.form.submit()">
+          <option value="">— Selecciona una obra —</option>
+          {% for o in obras %}<option value="{{ o.id }}" {{ 'selected' if obra_id==o.id|string }}>{{ o.nombre }}</option>{% endfor %}
+        </select></div>
+    </form>
+  </div>
+</div>
+
+{% if kpis %}
+<div class="row" style="margin-bottom:16px">
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">${{ "{:,.0f}".format(kpis.presupuestado|float) }}</div>
+    <div class="kpi-sm-lbl">Presupuesto revisado</div>
+  </div></div>
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">${{ "{:,.0f}".format(kpis.comprometido|float) }}</div>
+    <div class="kpi-sm-lbl">Comprometido (OC aprobadas)</div>
+  </div></div>
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">${{ "{:,.0f}".format(kpis.ejercido|float) }}</div>
+    <div class="kpi-sm-lbl">Ejercido a la fecha</div>
+  </div></div>
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ kpis.pct_ejercido }}%</div>
+    <div class="kpi-sm-lbl">% del presupuesto ejercido</div>
+  </div></div>
+</div>
+{% endif %}
+
+{% if obra_id %}
+<div class="card">
+  <div class="card-hd"><h3>Presupuesto por código de costo</h3>
+    <span style="color:var(--mt);font-size:12px">{{ lineas|length }} códigos</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr>
+        <th>Código</th><th>Descripción</th><th>Tipo</th>
+        <th style="text-align:right">Presupuesto revisado</th>
+        <th style="text-align:right">Comprometido</th>
+        <th style="text-align:right">Ejercido</th>
+        <th>Avance</th>
+      </tr></thead>
+      <tbody>
+      {% for l in lineas %}
+      {% set pct = ((l.costos_reales|float) / (l.monto_revisado|float) * 100) if l.monto_revisado and l.monto_revisado|float > 0 else 0 %}
+      <tr>
+        <td style="font-family:monospace;font-weight:600">{{ l.codigo }}</td>
+        <td style="font-size:12px">{{ l.descripcion }}</td>
+        <td style="font-size:12px">{{ l.tipo_costo or '—' }}</td>
+        <td style="text-align:right">${{ "{:,.0f}".format(l.monto_revisado|float) }}</td>
+        <td style="text-align:right">${{ "{:,.0f}".format(l.oc_aprobadas|float) }}</td>
+        <td style="text-align:right;font-weight:700">${{ "{:,.0f}".format(l.costos_reales|float) }}</td>
+        <td style="min-width:130px">
+          <div style="background:var(--s2);border:1px solid var(--bd);border-radius:6px;overflow:hidden;height:8px">
+            <div style="height:8px;width:{{ [pct,100]|min }}%;background:var(--ac)"></div>
+          </div>
+          <span style="font-size:11px;color:var(--mt)">{{ "%.0f"|format(pct) }}%</span>
+          {% if pct > 100 %}<span class="badge badge-dg" style="margin-left:4px">Sobregiro</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--mt)">Esta obra no tiene presupuesto importado todavía</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

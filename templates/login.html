@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>ESMA — Iniciar sesión</title>
+<link rel="icon" type="image/x-icon" href="/uploads/favicon.ico">
+<style>
+:root{--bg:#eef1f6;--s1:#ffffff;--bd:#dde1e8;--ac:#3B3F9E;--brand:#2E3192;--tx:#1c2230;--mt:#6b7280;--dg:#dc2626;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--tx);font-family:'Segoe UI',system-ui,sans-serif;
+     min-height:100vh;display:flex;align-items:center;justify-content:center;}
+.box{background:var(--s1);border:1px solid var(--bd);border-radius:12px;width:100%;max-width:380px;overflow:hidden;}
+.box-hd{background:var(--brand);padding:28px 40px 22px;text-align:center;}
+.box-bd{padding:28px 40px 32px;}
+.logo{font-size:22px;font-weight:800;color:#fff;text-align:center;margin-bottom:10px;letter-spacing:.5px;}
+.sub{font-size:13px;color:var(--mt);text-align:center;margin-bottom:28px;}
+label{display:block;font-size:12px;color:var(--mt);margin-bottom:5px;font-weight:600;}
+input{width:100%;background:var(--s1);border:1px solid var(--bd);border-radius:8px;
+      padding:10px 14px;color:var(--tx);font-size:14px;margin-bottom:14px;transition:.15s;}
+input:focus{outline:none;border-color:var(--ac);}
+button{width:100%;background:var(--ac);color:#fff;border:none;border-radius:8px;
+       padding:11px;font-size:14px;font-weight:700;cursor:pointer;transition:.15s;}
+button:hover{background:#262A6E;}
+.error{background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.3);color:var(--dg);
+       padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="box-hd">
+    
+    <img src="{{ logo_path }}" style="width:315px;height:70px;object-fit:fill;display:block;margin:8px auto 0">
+    <div class="logo">SISTEMA DE TELEMETRÍA Y CONTROL INTERNO</div>
+  </div>
+  <div class="box-bd">
+  <div class="sub">Sistema de Telemática y Control Interno</div>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="POST">
+    <label>Correo electrónico</label>
+    <input type="email" name="email" required placeholder="admin@grupoesma.com" autofocus>
+    <label>Contraseña</label>
+    <input type="password" name="password" required placeholder="••••••••">
+    <button type="submit">Iniciar sesión →</button>
+  </form>
+  </div>
+</div>
+</body>
+</html>

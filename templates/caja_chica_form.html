@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if comp else 'Nueva' }} Comprobación — ESMA{% endblock %}
+{% block page_title %}{{ 'Editar' if comp else 'Nueva' }} Comprobación Semanal{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('caja_chica') }}">Caja Chica</a> · {{ 'Editar' if comp else 'Nueva' }}{% endblock %}
+{% block content %}
+<div class="card" style="max-width:1100px">
+  <div class="card-bd">
+    <form method="POST" enctype="multipart/form-data" id="formComprobacion">
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <!--  PARTIDAS (Facturas / Gastos)                           -->
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <h4 style="margin:0;font-size:16px;font-weight:700">Partidas (Facturas / Gastos)</h4>
+        <!--<button type="button" class="btn btn-primary btn-sm" onclick="agregarPartida()">+ Agregar partida</button>-->
+      </div>
+      <div id="partidas_container">
+        <!-- Filas dinámicas de partidas -->
+      </div>
+      <p id="partidas_vacio" style="color:var(--mt);font-size:12px;text-align:center;padding:20px;display:none">Sin partidas. Click en "+ Agregar partida" para añadir.</p>
+
+      <div style="display:flex;gap:10px;margin-top:20px;padding-top:14px;border-top:1px solid #eee">
+        <button type="submit" class="btn btn-primary">{{ 'Actualizar' if comp else 'Crear comprobación' }}</button>
+        <a href="{{ url_for('caja_chica') }}" class="btn btn-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// Calendario ESMA: Semana 1 = lunes 29/dic/2025. Ciclo de 52 semanas.
+const LUNES_SEM1 = new Date(2025, 11, 29);
+
+function calcSemana(fechaStr) {
+  if (!fechaStr) return '';
+  const fecha = new Date(fechaStr + 'T00:00:00');
+  const diff = Math.floor((fecha - LUNES_SEM1) / (1000*60*60*24));
+  if (diff < 0) return '';
+  const sem = Math.floor(diff / 7) + 1;
+  return ((sem - 1) % 52) + 1;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PARTIDAS DINÁMICAS
+// ══════════════════════════════════════════════════════════════
+var contadorPartidas = 0;
+
+function agregarPartida() {
+  contadorPartidas++;
+  const idx = contadorPartidas;
+  const container = document.getElementById('partidas_container');
+  const vaciMsg = document.getElementById('partidas_vacio');
+  if (vaciMsg) vaciMsg.style.display = 'none';
+
+  const card = document.createElement('div');
+  card.className = 'partida-card';
+  card.id = 'partida_' + idx;
+  card.style.cssText = 'border:1px solid #ddd;border-radius:8px;padding:14px;margin-bottom:12px;background:#fafafa;position:relative;';
+
+  let html = '';
+  html += `<button type="button" onclick="eliminarPartida(${idx})" style="position:absolute;top:8px;right:12px;background:none;border:none;color:#e74c3c;font-size:20px;cursor:pointer;font-weight:700;line-height:1" title="Eliminar partida">&times;</button>`;
+
+  // Fila 1: Tipo + Fecha + Sem. No. + Proveedor
+  html += `
+    <div class="row" style="gap:8px;margin-bottom:8px">
+      <div class="col" style="max-width:150px"><label style="font-size:11px;font-weight:600">Es deducible</label>
+        <select class="form-control" name="partida_tipo_${idx}" id="partida_tipo_${idx}" onchange="toggleTipoPartida(${idx})" style="font-size:12px;font-weight:600">
+          <option value="1">Deducible</option>
+          <option value="0">No deducible</option>
+        </select></div>
+      <div class="col" style="max-width:140px"><label style="font-size:11px">Fecha</label>
+        <input class="form-control" type="date" name="partida_fecha_${idx}" id="partida_fecha_${idx}" style="font-size:12px" onchange="autoSemana(${idx})"></div>
+      <div class="col" style="max-width:80px"><label style="font-size:11px">Sem. No.</label>
+        <input class="form-control" type="text" id="partida_sem_${idx}" name="partida_semana_${idx}" style="font-size:12px;background:#f0f0f0;font-weight:700;text-align:center" readonly></div>
+      <div class="col"><label style="font-size:11px">Proveedor / Razón Social</label>
+        <input class="form-control" name="partida_proveedor_${idx}" style="font-size:12px"></div>
+    </div>`;
+
+  // Fila 2: Concepto
+  html += `
+    <div class="row" style="gap:8px;margin-bottom:8px">
+      <div class="col"><label style="font-size:11px">Concepto</label>
+        <input class="form-control" name="partida_concepto_${idx}" style="font-size:12px" required></div>
+    </div>`;
+
+  // Campos deducibles
+  html += `<div id="partida_ded_fields_${idx}">`;
+
+  html += `
+    <div class="row" style="gap:8px;margin-bottom:8px">
+      <div class="col"><label style="font-size:11px">Folio Fiscal (UUID)</label>
+        <input class="form-control" name="partida_folio_fiscal_${idx}" style="font-size:11px" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"></div>
+      <div class="col" style="max-width:130px"><label style="font-size:11px">RFC</label>
+        <input class="form-control" name="partida_rfc_${idx}" style="font-size:12px;text-transform:uppercase" maxlength="13"></div>
+    </div>`;
+
+  html += `
+    <div class="row" style="gap:8px;margin-bottom:8px">
+      <div class="col"><label style="font-size:11px">Subtotal</label>
+        <input class="form-control" type="number" step="0.01" name="partida_subtotal_${idx}" value="0" style="font-size:12px" oninput="calcIVAPartida(${idx})"></div>
+      <div class="col" style="max-width:90px"><label style="font-size:11px">%IVA</label>
+        <select class="form-control" name="partida_iva_pct_${idx}" style="font-size:12px" onchange="calcIVAPartida(${idx})">
+          <option value="16">16%</option><option value="8">8%</option><option value="0">0%</option>
+        </select></div>
+      <div class="col"><label style="font-size:11px">IVA ($)</label>
+        <input class="form-control" type="number" step="0.01" name="partida_iva_${idx}" id="partida_iva_${idx}" value="0" style="font-size:12px"></div>
+      <div class="col"><label style="font-size:11px">Otras (IEPS)</label>
+        <input class="form-control" type="number" step="0.01" name="partida_otras_${idx}" value="0" style="font-size:12px"></div>
+    </div>`;
+
+  html += `
+    <div class="row" style="gap:8px;margin-bottom:8px">
+      <div class="col"><label style="font-size:11px">ISH ($)</label>
+        <input class="form-control" type="number" step="0.01" name="partida_ish_${idx}" value="0" style="font-size:12px"></div>
+      <div class="col" style="max-width:70px"><label style="font-size:11px">%ISH</label>
+        <input class="form-control" type="number" step="0.01" name="partida_ish_pct_${idx}" value="0" style="font-size:12px"></div>
+      <div class="col"><label style="font-size:11px">Ret. ISR</label>
+        <input class="form-control" type="number" step="0.01" name="partida_retencion_isr_${idx}" value="0" style="font-size:12px"></div>
+      <div class="col" style="max-width:70px"><label style="font-size:11px">%Ret ISR</label>
+        <input class="form-control" type="number" step="0.01" name="partida_retencion_isr_pct_${idx}" value="0" style="font-size:12px"></div>
+      <div class="col"><label style="font-size:11px">Ret. IVA</label>
+        <input class="form-control" type="number" step="0.01" name="partida_retencion_iva_${idx}" value="0" style="font-size:12px"></div>
+      <div class="col" style="max-width:70px"><label style="font-size:11px">%Ret IVA</label>
+        <input class="form-control" type="number" step="0.01" name="partida_retencion_iva_pct_${idx}" value="0" style="font-size:12px"></div>
+    </div>`;
+
+  html += `</div>`;
+
+  // Campos no deducible
+  html += `<div id="partida_noded_fields_${idx}" style="display:none">`;
+  html += `
+    <div class="row" style="gap:8px;margin-bottom:8px">
+      <div class="col"><label style="font-size:11px">Subtotal</label>
+        <input class="form-control" type="number" step="0.01" name="partida_subtotal_noded_${idx}" value="0" style="font-size:12px"></div>
+      <div class="col"><label style="font-size:11px">Nota / Folio / Vale</label>
+        <input class="form-control" name="partida_nota_folio_${idx}" style="font-size:12px"></div>
+    </div>`;
+  html += `</div>`;
+
+  // Estatus pago + CFDI
+  html += `
+    <div class="row" style="gap:8px;margin-bottom:4px">
+      <div class="col" style="max-width:150px"><label style="font-size:11px">Estatus pago</label>
+        <select class="form-control" name="partida_estatus_pago_${idx}" style="font-size:12px">
+          <option value="no_pagado">No pagado</option><option value="pagado">Pagado</option>
+        </select></div>
+      <div class="col"><label style="font-size:11px">CFDI (PDF/XML)</label>
+        <input class="form-control" type="file" name="partida_cfdi_${idx}" accept=".pdf,.xml" style="font-size:11px;padding:4px"></div>
+    </div>`;
+
+  card.innerHTML = html;
+  container.appendChild(card);
+  actualizarIndices();
+}
+
+function autoSemana(idx) {
+  const fechaInput = document.getElementById('partida_fecha_' + idx);
+  const semInput = document.getElementById('partida_sem_' + idx);
+  if (fechaInput && semInput) {
+    semInput.value = calcSemana(fechaInput.value);
+  }
+}
+
+function toggleTipoPartida(idx) {
+  const tipo = document.getElementById('partida_tipo_' + idx).value;
+  const dedFields = document.getElementById('partida_ded_fields_' + idx);
+  const nodedFields = document.getElementById('partida_noded_fields_' + idx);
+  if (tipo === '1') {
+    dedFields.style.display = '';
+    nodedFields.style.display = 'none';
+  } else {
+    dedFields.style.display = 'none';
+    nodedFields.style.display = '';
+  }
+}
+
+function eliminarPartida(idx) {
+  const el = document.getElementById('partida_' + idx);
+  if (el) el.remove();
+  const container = document.getElementById('partidas_container');
+  const vaciMsg = document.getElementById('partidas_vacio');
+  if (container.children.length === 0 && vaciMsg) vaciMsg.style.display = 'block';
+  actualizarIndices();
+}
+
+function actualizarIndices() {
+  const cards = document.querySelectorAll('.partida-card');
+  const indices = [];
+  cards.forEach(c => { indices.push(c.id.replace('partida_', '')); });
+  let hiddenIdx = document.getElementById('partidas_indices');
+  if (!hiddenIdx) {
+    hiddenIdx = document.createElement('input');
+    hiddenIdx.type = 'hidden';
+    hiddenIdx.id = 'partidas_indices';
+    hiddenIdx.name = 'partidas_indices';
+    document.getElementById('formComprobacion').appendChild(hiddenIdx);
+  }
+  hiddenIdx.value = indices.join(',');
+}
+
+function calcIVAPartida(idx) {
+  const sub = document.querySelector(`[name="partida_subtotal_${idx}"]`);
+  const pct = document.querySelector(`[name="partida_iva_pct_${idx}"]`);
+  const iva = document.getElementById(`partida_iva_${idx}`);
+  if (sub && pct && iva) {
+    iva.value = (parseFloat(sub.value || 0) * parseFloat(pct.value || 0) / 100).toFixed(2);
+  }
+}
+
+// Agregar primera partida automáticamente al cargar
+agregarPartida();
+</script>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ accion }} Proveedor — ESMA{% endblock %}
+{% block page_title %}{{ accion }} Proveedor{% endblock %}
+{% block content %}
+<div class="card" style="max-width:720px">
+  <div class="card-hd"><h3>Datos fiscales y de contacto</h3></div>
+  <div class="card-bd">
+    <form method="POST">
+      <div class="row">
+        <div class="col"><div class="form-group"><label>Razón social</label>
+          <input class="form-control" name="razon_social" value="{{ prov.razon_social if prov else '' }}" required></div></div>
+        <div class="col"><div class="form-group"><label>RFC</label>
+          <input class="form-control" name="rfc" style="text-transform:uppercase" value="{{ prov.rfc if prov else '' }}"></div></div>
+      </div>
+      <div class="row">
+        <div class="col"><div class="form-group"><label>Persona</label>
+          <select class="form-control" name="tipo_persona">
+            <option value="moral" {{ 'selected' if prov and prov.tipo_persona=='moral' }}>Persona moral</option>
+            <option value="fisica" {{ 'selected' if prov and prov.tipo_persona=='fisica' }}>Persona física</option>
+          </select></div></div>
+        <div class="col"><div class="form-group"><label>Tipo de proveedor</label>
+          <select class="form-control" name="tipo_proveedor">
+            <option value="">— Selecciona —</option>
+            {% for t in tipos %}<option value="{{ t }}" {{ 'selected' if prov and prov.tipo_proveedor==t }}>{{ t }}</option>{% endfor %}
+          </select></div></div>
+      </div>
+      <div class="form-group"><label>Dirección</label>
+        <input class="form-control" name="direccion" value="{{ prov.direccion if prov else '' }}"></div>
+      <div class="row">
+        <div class="col"><div class="form-group"><label>Ciudad</label>
+          <input class="form-control" name="ciudad" value="{{ prov.ciudad if prov else '' }}"></div></div>
+        <div class="col"><div class="form-group"><label>Estado</label>
+          <input class="form-control" name="estado" value="{{ prov.estado if prov else '' }}"></div></div>
+        <div class="col"><div class="form-group"><label>C.P.</label>
+          <input class="form-control" name="cp" value="{{ prov.cp if prov else '' }}"></div></div>
+      </div>
+      <div class="row">
+        <div class="col"><div class="form-group"><label>Teléfono</label>
+          <input class="form-control" name="telefono" value="{{ prov.telefono if prov else '' }}"></div></div>
+        <div class="col"><div class="form-group"><label>Email</label>
+          <input class="form-control" type="email" name="email" value="{{ prov.email if prov else '' }}"></div></div>
+        <div class="col"><div class="form-group"><label>Contacto</label>
+          <input class="form-control" name="contacto" value="{{ prov.contacto if prov else '' }}"></div></div>
+      </div>
+      <div class="row">
+        <div class="col"><div class="form-group"><label>Banco</label>
+          <input class="form-control" name="banco" value="{{ prov.banco if prov else '' }}"></div></div>
+        <div class="col"><div class="form-group"><label>CLABE / Cuenta</label>
+          <input class="form-control" name="cuenta_clabe" value="{{ prov.cuenta_clabe if prov else '' }}"></div></div>
+      </div>
+      <div class="form-group"><label>Condiciones de pago habituales</label>
+        <select class="form-control" name="condiciones_pago_habitual">
+          <option value="">— Sin definir —</option>
+          {% for c in condiciones_pago %}
+          <option value="{{ c }}" {{ 'selected' if prov and prov.condiciones_pago_habitual==c }}>{{ c }}</option>
+          {% endfor %}
+        </select></div>
+      <div class="form-group"><label>Observaciones</label>
+        <textarea class="form-control" name="observaciones" rows="2">{{ prov.observaciones if prov else '' }}</textarea></div>
+      <div style="display:flex;gap:10px">
+        <button type="submit" class="btn btn-primary">{{ accion }} proveedor</button>
+        <a href="{{ url_for('proveedores') }}" class="btn btn-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

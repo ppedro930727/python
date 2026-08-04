@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% block title %}Scanner QR — Asistencia{% endblock %}
+{% block page_title %}Registrar Asistencia con QR{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('rrhh') }}">Recursos Humanos</a> · <a href="{{ url_for('rrhh_asistencia') }}">Asistencia</a> · Scanner QR{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('rrhh_asistencia') }}" class="btn btn-secondary">← Volver a Asistencia</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.scanner-layout{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;}
+.scanner-cam{flex:1;min-width:320px;max-width:480px;}
+.scanner-log{flex:1;min-width:300px;}
+.cam-wrapper{position:relative;width:100%;border-radius:12px;overflow:hidden;background:#000;}
+.cam-wrapper video{width:100%;display:block;transform:scaleX(-1);}
+.cam-wrapper canvas{display:none;}
+.qr-zone{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);
+  width:160px;height:160px;border:3px solid rgba(46,49,146,.8);border-radius:12px;
+  box-shadow:0 0 0 3000px rgba(0,0,0,.25);}
+.qr-zone::before{content:'QR aqui';position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);
+  font-size:10px;color:#fff;background:rgba(46,49,146,.8);padding:2px 8px;border-radius:4px;white-space:nowrap;}
+.face-zone{position:absolute;top:20px;left:50%;transform:translateX(-50%);
+  width:140px;height:140px;border:2px dashed rgba(255,255,255,.5);border-radius:50%;}
+.face-zone::before{content:'Tu rostro';position:absolute;top:-20px;left:50%;transform:translateX(-50%);
+  font-size:10px;color:rgba(255,255,255,.7);white-space:nowrap;}
+.cam-status{position:absolute;top:8px;right:8px;padding:4px 10px;border-radius:6px;
+  font-size:11px;font-weight:600;background:rgba(0,0,0,.6);color:#4ade80;}
+.cam-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;
+  transition:opacity .1s;}
+.cam-flash.active{opacity:.7;}
+.scan-result{padding:12px 14px;border-radius:10px;margin-bottom:10px;animation:fadeIn .3s;display:flex;gap:10px;align-items:center;}
+.scan-entrada{background:rgba(46,49,146,.12);border:1px solid rgba(46,49,146,.3);}
+.scan-salida{background:rgba(59,63,158,.12);border:1px solid rgba(59,63,158,.3);}
+.scan-error{background:rgba(220,53,69,.08);border:1px solid rgba(220,53,69,.3);}
+.scan-thumb{width:52px;height:52px;border-radius:8px;object-fit:cover;border:2px solid var(--bd);flex-shrink:0;}
+.scan-data{flex:1;}
+.scan-nombre{font-weight:700;font-size:13px;}
+.scan-info{font-size:11px;color:var(--mt);margin-top:2px;}
+.scan-tipo{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.scan-tipo-entrada{color:#2E3192;}
+.scan-tipo-salida{color:#3B3F9E;}
+.scan-tipo-error{color:#dc3545;}
+.counter{text-align:center;padding:14px;background:var(--s2);border-radius:10px;}
+.counter-val{font-size:28px;font-weight:800;color:var(--ac);}
+.counter-lbl{font-size:10px;color:var(--mt);text-transform:uppercase;margin-top:3px;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="scanner-layout">
+  <div class="scanner-cam">
+    <div class="card">
+      <div class="card-hd"><h3>Camara de Asistencia</h3>
+        <span id="cam-status-text" style="font-size:11px;color:var(--mt)">Iniciando...</span>
+      </div>
+      <div class="card-bd" style="padding:0">
+        <div style="padding:8px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px">
+          <label style="font-size:11px;color:var(--mt);white-space:nowrap">Camara:</label>
+          <select class="form-control" id="cam-select" style="font-size:12px;padding:4px 8px" onchange="cambiarCamara()">
+            <option value="">Cargando camaras...</option>
+          </select>
+        </div>
+        <div class="cam-wrapper" id="cam-wrapper">
+          <video id="cam-video" autoplay playsinline muted></video>
+          <canvas id="cam-canvas"></canvas>
+          <div class="face-zone"></div>
+          <div class="qr-zone"></div>
+          <div class="cam-status" id="cam-status">LISTO</div>
+          <div class="cam-flash" id="cam-flash"></div>
+        </div>
+        <!-- Fallback manual -->
+        <div id="manual-section" style="padding:14px;border-top:1px solid var(--bd);text-align:center">
+          <p style="font-size:11px;color:var(--mt);margin-bottom:8px">Registro manual :</p>
+          <div style="display:flex;gap:8px;max-width:300px;margin:0 auto">
+            <input class="form-control" type="text" id="manual-numero" placeholder="No. empleado"
+                   style="flex:1;font-size:15px;text-align:center"
+                   onkeydown="if(event.key==='Enter'){registrarManual()}">
+            <button class="btn btn-primary" onclick="registrarManual()">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:12px">
+      <div class="counter" style="flex:1">
+        <div class="counter-val" id="cnt-entradas">0</div>
+        <div class="counter-lbl">Entradas</div>
+      </div>
+      <div class="counter" style="flex:1">
+        <div class="counter-val" id="cnt-salidas">0</div>
+        <div class="counter-lbl">Salidas</div>
+      </div>
+    </div>
+  </div>
+  <div class="scanner-log">
+    <div class="card">
+      <div class="card-hd"><h3>Registros del dia</h3>
+        <span style="font-size:11px;color:var(--mt)" id="lbl-fecha"></span>
+      </div>
+      <div class="card-bd" id="log-container" style="max-height:520px;overflow-y:auto;">
+        <p style="color:var(--mt);font-size:13px;text-align:center;padding:30px">
+          Muestra tu QR frente a la camara para registrar asistencia.<br>
+          <span style="font-size:11px">Tu rostro debe ser visible en la parte superior.</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+var entradas=0, salidas=0, procesando=false, ultimoQR='', ultimoTs=0;
+var videoEl=document.getElementById('cam-video');
+var canvasEl=document.getElementById('cam-canvas');
+var flashEl=document.getElementById('cam-flash');
+
+document.getElementById('lbl-fecha').textContent=new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+// ── Iniciar cámara frontal ──────────────────────────────────────
+var currentStream=null;
+
+// Listar camaras disponibles
+navigator.mediaDevices.enumerateDevices().then(function(devices){
+  var sel=document.getElementById('cam-select');
+  sel.innerHTML='';
+  var videoDevices=devices.filter(function(d){return d.kind==='videoinput'});
+  if(videoDevices.length===0){
+    sel.innerHTML='<option value="">No se encontraron camaras</option>';
+    return;
+  }
+  videoDevices.forEach(function(d,i){
+    var opt=document.createElement('option');
+    opt.value=d.deviceId;
+    opt.textContent=d.label||('Camara '+(i+1));
+    sel.appendChild(opt);
+  });
+  // Preferir camara frontal (que tenga 'front' o 'user' en el label)
+  var frontal=videoDevices.find(function(d){return /front|user|facetime/i.test(d.label)});
+  if(frontal) sel.value=frontal.deviceId;
+  // Iniciar con la seleccionada
+  iniciarCamara(sel.value);
+}).catch(function(){
+  // Si no puede enumerar, iniciar con facingMode user
+  iniciarCamara(null);
+});
+
+function cambiarCamara(){
+  var deviceId=document.getElementById('cam-select').value;
+  iniciarCamara(deviceId);
+}
+
+function iniciarCamara(deviceId){
+  // Detener stream anterior
+  if(currentStream){
+    currentStream.getTracks().forEach(function(t){t.stop()});
+  }
+  // Forzar resolución 480x640 para consistencia en todos los dispositivos
+  var constraints={video:{width:{exact:480},height:{exact:640}}};
+  if(deviceId){
+    constraints.video.deviceId={exact:deviceId};
+  } else {
+    constraints.video.facingMode='user';
+  }
+  navigator.mediaDevices.getUserMedia(constraints).then(function(stream){
+    currentStream=stream;
+    videoEl.srcObject=stream;
+    videoEl.play();
+    document.getElementById('cam-status-text').textContent='Camara activa — muestra tu QR';
+    document.getElementById('cam-status-text').style.color='var(--ok)';
+    document.getElementById('cam-status').textContent='ESCANEANDO';
+    document.getElementById('cam-status').style.color='#4ade80';
+    // Canvas siempre 480x640
+    canvasEl.width=480;
+    canvasEl.height=640;
+    // Iniciar deteccion QR
+    iniciarDeteccionQR();
+  }).catch(function(err){
+    // Si falla con exact, reintentar con ideal (algunas cámaras no soportan exact)
+    var fallback={video:{width:{ideal:480},height:{ideal:640}}};
+    if(deviceId) fallback.video.deviceId={exact:deviceId};
+    else fallback.video.facingMode='user';
+    navigator.mediaDevices.getUserMedia(fallback).then(function(stream){
+      currentStream=stream;
+      videoEl.srcObject=stream;
+      videoEl.play();
+      document.getElementById('cam-status-text').textContent='Camara activa — muestra tu QR';
+      document.getElementById('cam-status-text').style.color='var(--ok)';
+      document.getElementById('cam-status').textContent='ESCANEANDO';
+      document.getElementById('cam-status').style.color='#4ade80';
+      canvasEl.width=480;
+      canvasEl.height=640;
+      iniciarDeteccionQR();
+    }).catch(function(err2){
+      document.getElementById('cam-status-text').textContent='Error: '+err2.message;
+      document.getElementById('cam-status-text').style.color='var(--al)';
+      document.getElementById('cam-status').textContent='SIN CAMARA';
+      document.getElementById('cam-status').style.color='#f87171';
+    });
+  });
+}
+
+// ── Detección QR continua sobre el video ─────────────────────────
+var scanInterval=null;
+var useBarcodeDetector=('BarcodeDetector' in window);
+
+function iniciarDeteccionQR(){
+  if(scanInterval) clearInterval(scanInterval);
+
+  if(useBarcodeDetector){
+    // API nativa (Chrome Android, Edge) — instantáneo
+    var detector=new BarcodeDetector({formats:['qr_code']});
+    scanInterval=setInterval(function(){
+      if(procesando || !videoEl.srcObject || videoEl.readyState<2) return;
+      detector.detect(videoEl).then(function(barcodes){
+        if(barcodes.length>0) onQRDetected(barcodes[0].rawValue);
+      }).catch(function(){});
+    },250);
+  } else {
+    // Fallback PC: leer ImageData directo y decodificar con jsQR (mas rapido que scanFile)
+    var scanCanvas=document.createElement('canvas');
+    scanCanvas.width=320; scanCanvas.height=240; // Resolución baja para escaneo rápido
+    var scanCtx=scanCanvas.getContext('2d',{willReadFrequently:true});
+    scanInterval=setInterval(function(){
+      if(procesando || !videoEl.srcObject || videoEl.readyState<2) return;
+      scanCtx.drawImage(videoEl,0,0,320,240);
+      var imageData=scanCtx.getImageData(0,0,320,240);
+      var code=jsQR(imageData.data,320,240,{inversionAttempts:'dontInvert'});
+      if(code && code.data) onQRDetected(code.data);
+    },200);
+  }
+}
+
+function onQRDetected(decodedText){
+  var now=Date.now();
+  // Anti-duplicado: mismo QR en menos de 3 seg se ignora
+  if(decodedText===ultimoQR && (now-ultimoTs)<3000) return;
+  if(procesando) return;
+  ultimoQR=decodedText;
+  ultimoTs=now;
+  procesando=true;
+
+  // Flash visual
+  flashEl.classList.add('active');
+  setTimeout(function(){flashEl.classList.remove('active')},200);
+
+  // Capturar foto del frame actual (incluye rostro + QR)
+  var w=480, h=640;
+  canvasEl.width=w; canvasEl.height=h;
+  var ctx=canvasEl.getContext('2d');
+  ctx.save();
+  ctx.scale(-1,1); // Espejo como se ve en pantalla
+  ctx.drawImage(videoEl,-w,0,w,h);
+  ctx.restore();
+  var fotoBase64=canvasEl.toDataURL('image/jpeg',0.75);
+
+  // Cambiar status
+  document.getElementById('cam-status').textContent='REGISTRANDO...';
+  document.getElementById('cam-status').style.color='#fbbf24';
+
+  // Enviar al servidor
+  enviarRegistro(decodedText, fotoBase64);
+}
+
+function enviarRegistro(numero, fotoBase64){
+  var body={numero_empleado:numero};
+  if(fotoBase64) body.foto=fotoBase64;
+
+  fetch('/api/asistencia/qr',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  })
+  .then(function(r){return r.json()})
+  .then(function(data){
+    agregarRegistro(data);
+    procesando=false;
+    document.getElementById('cam-status').textContent='ESCANEANDO';
+    document.getElementById('cam-status').style.color='#4ade80';
+  })
+  .catch(function(err){
+    agregarRegistro({ok:false, msg:'Error: '+err, tipo:'error'});
+    procesando=false;
+    document.getElementById('cam-status').textContent='ESCANEANDO';
+    document.getElementById('cam-status').style.color='#4ade80';
+  });
+}
+
+function registrarManual(){
+  var input=document.getElementById('manual-numero');
+  var numero=input.value.trim();
+  if(!numero || procesando) return;
+  procesando=true;
+  // Intentar capturar foto si hay video activo
+  var fotoBase64=null;
+  if(videoEl.srcObject && videoEl.readyState>=2){
+    var w=480, h=640;
+    canvasEl.width=w;canvasEl.height=h;
+    var ctx=canvasEl.getContext('2d');
+    ctx.save();ctx.scale(-1,1);
+    ctx.drawImage(videoEl,-w,0,w,h);
+    ctx.restore();
+    fotoBase64=canvasEl.toDataURL('image/jpeg',0.75);
+    flashEl.classList.add('active');
+    setTimeout(function(){flashEl.classList.remove('active')},200);
+  }
+  enviarRegistro(numero, fotoBase64);
+  input.value='';
+}
+
+function agregarRegistro(data){
+  var container=document.getElementById('log-container');
+  if(container.querySelector('p')) container.innerHTML='';
+
+  var cls='scan-error', tipoCls='scan-tipo-error';
+  if(data.ok && data.tipo==='entrada'){cls='scan-entrada';tipoCls='scan-tipo-entrada';entradas++;}
+  if(data.ok && data.tipo==='salida'){cls='scan-salida';tipoCls='scan-tipo-salida';salidas++;}
+
+  var hora=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var html='<div class="scan-result '+cls+'">';
+  if(data.foto_url) html+='<img class="scan-thumb" src="'+data.foto_url+'">';
+  html+='<div class="scan-data">';
+  html+='<div class="scan-tipo '+tipoCls+'">'+(data.tipo||'ERROR').toUpperCase()+'</div>';
+  if(data.empleado) html+='<div class="scan-nombre">'+data.empleado+'</div>';
+  html+='<div class="scan-info">'+(data.numero?'No. '+data.numero+' — ':'')+hora+'</div>';
+  html+='<div class="scan-info">'+data.msg+'</div>';
+  html+='</div></div>';
+
+  container.insertAdjacentHTML('afterbegin',html);
+  document.getElementById('cnt-entradas').textContent=entradas;
+  document.getElementById('cnt-salidas').textContent=salidas;
+}
+</script>
+{% endblock %}

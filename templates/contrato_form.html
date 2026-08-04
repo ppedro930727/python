@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}{{ accion }} Contrato — ESMA{% endblock %}
+{% block page_title %}{{ accion }} Contrato{% endblock %}
+{% block breadcrumb %}Control Financiero · <a href="{{ url_for('contratos') }}">Contratos</a> · {{ accion }}{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('contratos') }}" class="btn btn-secondary">← Volver</a>
+{% endblock %}
+{% block content %}
+
+<form method="POST">
+  <div class="row" style="gap:16px;align-items:flex-start">
+
+    <!-- Columna 1: Datos generales -->
+    <div class="card" style="flex:1;min-width:340px">
+      <div class="card-hd"><h3>Datos del Contrato</h3></div>
+      <div class="card-bd">
+        <div class="row" style="gap:10px;margin-bottom:10px">
+          <div style="flex:1"><div class="form-group">
+            <label>Número *</label>
+            <input type="text" class="form-control" name="numero" value="{{ c.numero if c else '' }}" required>
+          </div></div>
+          <div style="flex:1"><div class="form-group">
+            <label>Tipo de contrato</label>
+            <select class="form-control" name="tipo_contrato">
+              <option value="">— Seleccionar —</option>
+              <option value="Subcontrato" {{ 'selected' if c and c.tipo_contrato=='Subcontrato' }}>Subcontrato</option>
+              <option value="Orden de compra" {{ 'selected' if c and c.tipo_contrato=='Orden de compra' }}>Orden de compra</option>
+              <option value="Contrato principal" {{ 'selected' if c and c.tipo_contrato=='Contrato principal' }}>Contrato principal</option>
+            </select>
+          </div></div>
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label>Compañía contratista</label>
+          <input type="text" class="form-control" name="compania_contratista" value="{{ c.compania_contratista if c else '' }}">
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label>Título</label>
+          <input type="text" class="form-control" name="titulo" value="{{ c.titulo if c else '' }}">
+        </div>
+        <div class="row" style="gap:10px;margin-bottom:10px">
+          <div style="flex:1"><div class="form-group">
+            <label>Estatus</label>
+            <select class="form-control" name="estatus">
+              <option value="Aprobado" {{ 'selected' if c and c.estatus=='Aprobado' }}>Aprobado</option>
+              <option value="Pendiente" {{ 'selected' if c and c.estatus=='Pendiente' }}>Pendiente</option>
+              <option value="Cerrado" {{ 'selected' if c and c.estatus=='Cerrado' }}>Cerrado</option>
+            </select>
+          </div></div>
+          <div style="flex:1"><div class="form-group">
+            <label>Ejecutado</label>
+            <select class="form-control" name="ejecutado">
+              <option value="No" {{ 'selected' if not c or c.ejecutado=='No' }}>No</option>
+              <option value="Sí" {{ 'selected' if c and c.ejecutado=='Sí' }}>Sí</option>
+            </select>
+          </div></div>
+          <div style="flex:1"><div class="form-group">
+            <label>Obra</label>
+            <select class="form-control" name="id_obra">
+              <option value="">— Sin obra —</option>
+              {% for o in obras %}<option value="{{ o.id }}" {{ 'selected' if c and c.id_obra==o.id }}>{{ o.nombre }}</option>{% endfor %}
+            </select>
+          </div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Columna 2: Montos -->
+    <div class="card" style="flex:1;min-width:340px">
+      <div class="card-hd"><h3>Montos</h3></div>
+      <div class="card-bd">
+        <div class="row" style="gap:10px;margin-bottom:10px">
+          <div style="flex:1"><div class="form-group">
+            <label>Monto original</label>
+            <input type="number" step="0.01" class="form-control" name="monto_original" value="{{ c.monto_original if c else '0' }}">
+          </div></div>
+          <div style="flex:1"><div class="form-group">
+            <label>Órdenes de cambio aprobadas</label>
+            <input type="number" step="0.01" class="form-control" name="ordenes_cambio_aprobadas" value="{{ c.ordenes_cambio_aprobadas if c else '0' }}">
+          </div></div>
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label>Monto revisado</label>
+          <input type="number" step="0.01" class="form-control" name="monto_revisado" value="{{ c.monto_revisado if c else '0' }}">
+        </div>
+        <div class="row" style="gap:10px;margin-bottom:10px">
+          <div style="flex:1"><div class="form-group">
+            <label>Facturado</label>
+            <input type="number" step="0.01" class="form-control" name="facturado" value="{{ c.facturado if c else '0' }}">
+          </div></div>
+          <div style="flex:1"><div class="form-group">
+            <label>Pagos emitidos</label>
+            <input type="number" step="0.01" class="form-control" name="pagos_emitidos" value="{{ c.pagos_emitidos if c else '0' }}">
+          </div></div>
+        </div>
+        <div class="row" style="gap:10px;margin-bottom:10px">
+          <div style="flex:1"><div class="form-group">
+            <label>% Pagado</label>
+            <input type="number" step="0.01" class="form-control" name="pct_pagado" value="{{ c.pct_pagado if c else '0' }}">
+          </div></div>
+          <div style="flex:1"><div class="form-group">
+            <label>Saldo restante</label>
+            <input type="number" step="0.01" class="form-control" name="saldo_restante" value="{{ c.saldo_restante if c else '0' }}">
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Proveedor -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-hd"><h3>Proveedor / Contratista</h3></div>
+    <div class="card-bd">
+      <div class="row" style="gap:10px">
+        <div style="flex:2"><div class="form-group">
+          <label>Proveedor</label>
+          <input type="text" class="form-control" name="proveedor" value="{{ c.proveedor if c else '' }}">
+        </div></div>
+        <div style="flex:1"><div class="form-group">
+          <label>Teléfono</label>
+          <input type="text" class="form-control" name="telefono_proveedor" value="{{ c.telefono_proveedor if c else '' }}">
+        </div></div>
+        <div style="flex:1"><div class="form-group">
+          <label>Email</label>
+          <input type="email" class="form-control" name="email_proveedor" value="{{ c.email_proveedor if c else '' }}">
+        </div></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;text-align:right">
+    <a href="{{ url_for('contratos') }}" class="btn btn-secondary">Cancelar</a>
+    <button type="submit" class="btn btn-primary">💾 Guardar Contrato</button>
+  </div>
+</form>
+
+{% endblock %}

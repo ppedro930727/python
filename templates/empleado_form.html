@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}{{ accion }} Empleado — ESMA{% endblock %}
+{% block page_title %}{{ accion }} Empleado{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('rrhh') }}">Recursos Humanos</a> · {{ accion }}{% endblock %}
+{% block content %}
+<div class="card" style="max-width:900px">
+  <div class="card-hd"><h3>{{ accion }} empleado</h3></div>
+  <div class="card-bd">
+    <form method="POST" enctype="multipart/form-data">
+      <h4 style="font-size:13px;color:var(--ac);margin-bottom:12px;border-bottom:1px solid var(--bd);padding-bottom:6px">Datos personales</h4>
+      <div class="row">
+        <div class="col"><div class="form-group"><label>Nombre(s)</label>
+          <input class="form-control" name="nombre" value="{{ emp.nombre if emp else '' }}" required></div></div>
+        <div class="col"><div class="form-group"><label>Apellido paterno</label>
+          <input class="form-control" name="apellido_paterno" value="{{ emp.apellido_paterno if emp else '' }}" required></div></div>
+        <div class="col"><div class="form-group"><label>Apellido materno</label>
+          <input class="form-control" name="apellido_materno" value="{{ emp.apellido_materno if emp else '' }}"></div></div>
+      </div>
+      <div class="row">
+        <div class="col"><div class="form-group"><label>CURP</label>
+          <input class="form-control" name="curp" value="{{ emp.curp if emp else '' }}" maxlength="18"></div></div>
+        <div class="col"><div class="form-group"><label>RFC</label>
+          <input class="form-control" name="rfc" value="{{ emp.rfc if emp else '' }}" maxlength="13"></div></div>
+        <div class="col"><div class="form-group"><label>NSS (Seguro Social)</label>
+          <input class="form-control" name="nss" value="{{ emp.nss if emp else '' }}" maxlength="15"></div></div>
+      </div>
+      <div class="row">
+        <div class="col"><div class="form-group"><label>Fecha nacimiento</label>
+          <input class="form-control" type="date" name="fecha_nacimiento" value="{{ emp.fecha_nacimiento if emp else '' }}"></div></div>
+        <div class="col"><div class="form-group"><label>Telefono</label>
+          <input class="form-control" name="telefono" value="{{ emp.telefono if emp else '' }}"></div></div>
+        <div class="col"><div class="form-group"><label>Email</label>
+          <input class="form-control" type="email" name="email" value="{{ emp.email if emp else '' }}"></div></div>
+      </div>
+      <div class="form-group"><label>Direccion</label>
+        <input class="form-control" name="direccion" value="{{ emp.direccion if emp else '' }}"></div>
+      <div class="form-group"><label>Contacto de emergencia</label>
+        <input class="form-control" name="contacto_emergencia" value="{{ emp.contacto_emergencia if emp else '' }}" placeholder="Nombre - Tel - Parentesco"></div>
+
+      <h4 style="font-size:13px;color:var(--ac);margin:20px 0 12px;border-bottom:1px solid var(--bd);padding-bottom:6px">Datos laborales</h4>
+      <div class="row">
+        <div class="col"><div class="form-group"><label>No. empleado</label>
+          <input class="form-control" name="numero_empleado" value="{{ emp.numero_empleado if emp else '' }}"></div></div>
+        <div class="col"><div class="form-group"><label>Puesto</label>
+          <input class="form-control" name="puesto" value="{{ emp.puesto if emp else '' }}"></div></div>
+        <div class="col"><div class="form-group"><label>Departamento</label>
+          <select class="form-control" name="departamento">
+            <option value="">— Seleccionar —</option>
+            {% for d in departamentos %}<option value="{{ d }}" {{ 'selected' if emp and emp.departamento==d }}>{{ d }}</option>{% endfor %}
+          </select></div></div>
+      </div>
+      <div class="row">
+        <div class="col"><div class="form-group"><label>Obra asignada</label>
+          <select class="form-control" name="id_obra">
+            <option value="">— Sin asignar —</option>
+            {% for o in obras %}<option value="{{ o.id }}" {{ 'selected' if emp and emp.id_obra==o.id }}>{{ o.nombre }}</option>{% endfor %}
+          </select></div></div>
+        <div class="col"><div class="form-group"><label>Tipo contrato</label>
+          <select class="form-control" name="tipo_contrato">
+            {% for t in tipos_contrato %}<option value="{{ t }}" {{ 'selected' if emp and emp.tipo_contrato==t }}>{{ t }}</option>{% endfor %}
+          </select></div></div>
+        <div class="col"><div class="form-group"><label>Fecha ingreso</label>
+          <input class="form-control" type="date" name="fecha_ingreso" value="{{ emp.fecha_ingreso if emp else '' }}"></div></div>
+      </div>
+
+      <h4 style="font-size:13px;color:var(--ac);margin:20px 0 12px;border-bottom:1px solid var(--bd);padding-bottom:6px">Salario y datos bancarios</h4>
+      <div class="row">
+        <div class="col"><div class="form-group"><label>Salario diario ($)</label>
+          <input class="form-control" type="number" step="0.01" name="salario_diario" value="{{ emp.salario_diario if emp and emp.salario_diario else '' }}"></div></div>
+        <div class="col"><div class="form-group"><label>Salario semanal ($)</label>
+          <input class="form-control" type="number" step="0.01" name="salario_semanal" value="{{ emp.salario_semanal if emp and emp.salario_semanal else '' }}"></div></div>
+        <div class="col"><div class="form-group"><label>Tasa hora extra ($)</label>
+          <input class="form-control" type="number" step="0.01" name="tasa_hora_extra" value="{{ emp.tasa_hora_extra if emp and emp.tasa_hora_extra else '' }}" placeholder="Default: diario/8 x2"></div></div>
+      </div>
+      <div class="row">
+        <div class="col"><div class="form-group"><label>Banco</label>
+          <input class="form-control" name="banco" value="{{ emp.banco if emp else '' }}"></div></div>
+        <div class="col"><div class="form-group"><label>No. cuenta</label>
+          <input class="form-control" name="cuenta_banco" value="{{ emp.cuenta_banco if emp else '' }}"></div></div>
+        <div class="col"><div class="form-group"><label>CLABE</label>
+          <input class="form-control" name="clabe" value="{{ emp.clabe if emp else '' }}" maxlength="18"></div></div>
+      </div>
+
+      <div class="form-group"><label>Foto del empleado</label>
+        <input class="form-control" type="file" name="foto" accept="image/*"></div>
+      {% if emp and emp.foto %}
+      <div style="margin-top:8px;display:flex;align-items:center;gap:12px">
+        <img src="/uploads/{{ emp.foto }}" alt="Foto actual" style="width:80px;height:80px;border-radius:8px;object-fit:cover;border:2px solid var(--bd)">
+        <span style="font-size:11px;color:var(--mt)">Foto actual: {{ emp.foto }}</span>
+      </div>
+      {% endif %}
+
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button type="submit" class="btn btn-primary">{{ accion }} empleado</button>
+        <a href="{{ url_for('rrhh') }}" class="btn btn-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

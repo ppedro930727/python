@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}Nomina — ESMA{% endblock %}
+{% block page_title %}Nomina Semanal{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('rrhh') }}">Recursos Humanos</a> · Nomina{% endblock %}
+{% block topbar_actions %}
+{% if user_perms.get('rrhh',{}).get('crear') %}
+<button class="btn btn-dark" onclick="document.getElementById('overlayImportarNomina').style.display='flex'">📥 Importar Excel</button>
+<button class="btn btn-primary" onclick="document.getElementById('overlayCrearNomina').style.display='flex'">+ Crear</button>
+{% endif %}
+{% endblock %}
+{% block content %}
+
+<!-- Filtros y generar -->
+<div class="card" style="margin-bottom:16px">
+  <div class="card-bd">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+      <!-- Consultar nomina existente -->
+      <form method="GET" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Semana</label>
+          <select class="form-control" name="semana">
+            {% for s in semanas_disponibles %}<option value="{{ s.semana }}" {{ 'selected' if semana==s.semana }}>{{ s.semana }} ({{ s.inicio }})</option>{% endfor %}
+            {% if not semanas_disponibles %}<option value="">Sin nominas generadas</option>{% endif %}
+          </select></div>
+        <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Obra</label>
+          <select class="form-control" name="obra">
+            <option value="">Todas</option>
+            {% for o in obras %}<option value="{{ o.id }}" {{ 'selected' if obra_filtro==o.id|string }}>{{ o.nombre }}</option>{% endfor %}
+          </select></div>
+        <button type="submit" class="btn btn-primary">Consultar</button>
+      </form>
+
+      <!-- Generar nueva nomina -->
+      {% if user_perms.get('rrhh',{}).get('crear') %}
+      <div style="border-left:1px solid var(--bd);padding-left:16px">
+        <form method="POST" action="{{ url_for('rrhh_nomina_generar') }}" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Desde</label>
+            <input class="form-control" type="date" name="fecha_inicio" required></div>
+          <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Hasta</label>
+            <input class="form-control" type="date" name="fecha_fin" required></div>
+          <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Obra (opc.)</label>
+            <select class="form-control" name="id_obra">
+              <option value="">Todas</option>
+              {% for o in obras %}<option value="{{ o.id }}">{{ o.nombre }}</option>{% endfor %}
+            </select></div>
+          <button type="submit" class="btn btn-dark">Generar nomina</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if kpis %}
+<!-- KPIs de la semana -->
+<div class="row" style="margin-bottom:16px">
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ kpis.total_empleados or 0 }}</div>
+    <div class="kpi-sm-lbl">Empleados</div>
+  </div></div>
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ kpis.total_dias or 0 }}</div>
+    <div class="kpi-sm-lbl">Total dias</div>
+  </div></div>
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ "%.1f"|format(kpis.total_horas_extra|float) if kpis.total_horas_extra else 0 }}</div>
+    <div class="kpi-sm-lbl">Hrs extra</div>
+  </div></div>
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">${{ "{:,.0f}".format(kpis.total_salario_base|float) if kpis.total_salario_base else 0 }}</div>
+    <div class="kpi-sm-lbl">Salario base</div>
+  </div></div>
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">${{ "{:,.0f}".format(kpis.total_extras|float) if kpis.total_extras else 0 }}</div>
+    <div class="kpi-sm-lbl">Pago extras</div>
+  </div></div>
+  <div class="col"><div class="kpi-card" style="border:2px solid var(--ac)">
+    <div class="kpi-sm-val" style="color:var(--ac)">${{ "{:,.0f}".format(kpis.gran_total|float) if kpis.gran_total else 0 }}</div>
+    <div class="kpi-sm-lbl">Gran total</div>
+  </div></div>
+</div>
+
+<!-- Acciones de la nomina -->
+{% if user_perms.get('rrhh',{}).get('editar') %}
+<div style="margin-bottom:16px;display:flex;gap:10px">
+  {% if kpis.borradores and kpis.borradores > 0 %}
+  <form method="POST" action="{{ url_for('rrhh_nomina_aprobar') }}" onsubmit="return confirm('Aprobar toda la nomina de esta semana?')">
+    <input type="hidden" name="semana" value="{{ semana }}">
+    <button type="submit" class="btn btn-primary">Aprobar nomina ({{ kpis.borradores }} pendientes)</button>
+  </form>
+  {% endif %}
+  {% if kpis.aprobadas and kpis.aprobadas > 0 %}
+  <form method="POST" action="{{ url_for('rrhh_nomina_pagar') }}" onsubmit="return confirm('Marcar como pagada la nomina aprobada?')">
+    <input type="hidden" name="semana" value="{{ semana }}">
+    <button type="submit" class="btn btn-dark">Marcar como pagada ({{ kpis.aprobadas }})</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+<!-- Tabla de nomina -->
+<div class="card">
+  <div class="card-hd"><h3>Detalle de nomina{% if semana %} — {{ semana }}{% endif %}</h3></div>
+  <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr>
+        <th>No.</th><th>Empleado</th><th>Puesto</th><th>Obra</th>
+        <th style="text-align:center">Dias</th><th style="text-align:center">Hrs extra</th>
+        <th style="text-align:right">Salario base</th><th style="text-align:right">Extras</th>
+        <th style="text-align:right">Total</th><th>Banco</th><th>Estatus</th>
+      </tr></thead>
+      <tbody>
+      {% set ns = namespace(gran_total=0) %}
+      {% for n in nomina %}
+      {% set ns.gran_total = ns.gran_total + (n.total_pagar|float) %}
+      {% set est_badge = {'borrador':'badge-mt','aprobada':'badge-wn','pagada':'badge-ok'} %}
+      <tr>
+        <td style="font-size:11px;color:var(--mt)">{{ n.numero_empleado or '—' }}</td>
+        <td style="font-weight:600">{{ n.apellido_paterno }} {{ n.nombre }}</td>
+        <td style="font-size:12px">{{ n.puesto or '—' }}</td>
+        <td style="font-size:11px;color:var(--mt)">{{ n.obra_nombre or '—' }}</td>
+        <td style="text-align:center">{{ n.dias_trabajados }}</td>
+        <td style="text-align:center;color:var(--ac)">{{ "%.1f"|format(n.horas_extra|float) if n.horas_extra else '—' }}</td>
+        <td style="text-align:right">${{ "{:,.2f}".format(n.salario_base|float) }}</td>
+        <td style="text-align:right;color:var(--ac)">${{ "{:,.2f}".format(n.pago_horas_extra|float) }}</td>
+        <td style="text-align:right;font-weight:700">${{ "{:,.2f}".format(n.total_pagar|float) }}</td>
+        <td style="font-size:11px">{{ n.banco or '—' }} {{ n.cuenta_banco or '' }}</td>
+        <td><span class="badge {{ est_badge.get(n.estatus,'badge-mt') }}">{{ n.estatus }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="11" style="text-align:center;padding:30px;color:var(--mt)">
+        {% if semana %}Sin registros de nomina para esta semana{% else %}Selecciona una semana o genera una nueva nomina{% endif %}
+      </td></tr>
+      {% endfor %}
+      {% if nomina %}
+      <tr style="border-top:2px solid var(--bd);font-weight:700">
+        <td colspan="8" style="text-align:right">TOTAL A PAGAR:</td>
+        <td style="text-align:right;font-size:16px;color:var(--ac)">${{ "{:,.2f}".format(ns.gran_total) }}</td>
+        <td colspan="2"></td>
+      </tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Overlay Importar Excel Nomina -->
+{% if user_perms.get('rrhh',{}).get('crear') %}
+<div id="overlayImportarNomina" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#1c1e5e;border:1px solid #2e3192;color:#e3e4f7;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);width:100%;max-width:480px;margin:20px;">
+    <form method="POST" action="{{ url_for('rrhh_nomina_importar') }}" enctype="multipart/form-data">
+      <div style="border-bottom:1px solid #2e3192;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;">
+        <h5 style="font-weight:600;font-size:16px;margin:0;">📥 Importar Nómina Semanal</h5>
+        <button type="button" onclick="document.getElementById('overlayImportarNomina').style.display='none'" style="background:none;border:none;color:#e3e4f7;font-size:22px;cursor:pointer;line-height:1;">&times;</button>
+      </div>
+      <div style="padding:20px 24px;">
+        <p style="font-size:13px;color:#a0a3d0;margin-bottom:18px;">
+          Sube el archivo Excel de nómina semanal. El sistema detecta automáticamente empleados,
+          días trabajados, horas extra y calcula la semana según el calendario ESMA.
+        </p>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:13px;font-weight:500;display:block;margin-bottom:5px;">Obra (opc.)</label>
+          <select name="id_obra" style="width:100%;padding:8px 12px;background:#161840;border:1px solid #2e3192;color:#e3e4f7;border-radius:6px;">
+            <option value="">— Todas —</option>
+            {% for o in obras %}<option value="{{ o.id }}">{{ o.nombre }}</option>{% endfor %}
+          </select>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:13px;font-weight:500;display:block;margin-bottom:5px;">Archivo Excel (.xlsx)</label>
+          <input type="file" name="archivo" style="width:100%;padding:8px;background:#161840;border:1px solid #2e3192;color:#e3e4f7;border-radius:6px;" accept=".xlsx,.xls" required>
+        </div>
+      </div>
+      <div style="border-top:1px solid #2e3192;padding:14px 24px;display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" onclick="document.getElementById('overlayImportarNomina').style.display='none'" class="btn btn-secondary">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Importar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<!-- Overlay Crear Nomina Manual -->
+{% if user_perms.get('rrhh',{}).get('crear') %}
+<div id="overlayCrearNomina" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#1c1e5e;border:1px solid #2e3192;color:#e3e4f7;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);width:100%;max-width:560px;margin:20px;max-height:90vh;overflow-y:auto;">
+    <form method="POST" action="{{ url_for('rrhh_nomina_manual') }}">
+      <div style="border-bottom:1px solid #2e3192;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;">
+        <h5 style="font-weight:600;font-size:16px;margin:0;">+ Registro Manual de Nómina</h5>
+        <button type="button" onclick="document.getElementById('overlayCrearNomina').style.display='none'" style="background:none;border:none;color:#e3e4f7;font-size:22px;cursor:pointer;line-height:1;">&times;</button>
+      </div>
+      <div style="padding:20px 24px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div style="grid-column:1/-1">
+            <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Empleado</label>
+            <select name="id_empleado" class="form-control" required>
+              <option value="">— Selecciona —</option>
+              {% for e in empleados_lista %}
+              <option value="{{ e.id }}">{{ e.apellido_paterno }} {{ e.nombre }} — {{ e.puesto or 'Sin puesto' }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Fecha inicio (lunes)</label>
+            <input type="date" name="fecha_inicio" class="form-control" required>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Fecha fin (domingo)</label>
+            <input type="date" name="fecha_fin" class="form-control" required>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Días trabajados</label>
+            <input type="number" name="dias_trabajados" class="form-control" step="0.5" min="0" max="7" value="6" required>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Horas extra</label>
+            <input type="number" name="horas_extra" class="form-control" step="0.5" min="0" value="0">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Salario base ($)</label>
+            <input type="number" name="salario_base" class="form-control" step="0.01" min="0" value="0" required>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Pago horas extra ($)</label>
+            <input type="number" name="pago_horas_extra" class="form-control" step="0.01" min="0" value="0">
+          </div>
+          <div style="grid-column:1/-1">
+            <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Total a pagar ($)</label>
+            <input type="number" name="total_pagar" class="form-control" step="0.01" min="0" value="0" required>
+          </div>
+        </div>
+        <p style="font-size:11px;color:#a0a3d0;margin-top:12px;">
+          La semana se calcula automáticamente a partir de la fecha de inicio (calendario ESMA).
+        </p>
+      </div>
+      <div style="border-top:1px solid #2e3192;padding:14px 24px;display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" onclick="document.getElementById('overlayCrearNomina').style.display='none'" class="btn btn-secondary">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

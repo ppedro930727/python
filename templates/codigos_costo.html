@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Códigos de Costo — ESMA{% endblock %}
+{% block page_title %}Catálogo de Códigos de Costo{% endblock %}
+{% block breadcrumb %}Control Financiero · Presupuesto{% endblock %}
+{% block topbar_actions %}
+{% if user_perms.get('presupuesto',{}).get('crear') %}
+<a href="{{ url_for('codigo_costo_nuevo') }}" class="btn btn-primary">+ Nuevo código</a>
+<a href="{{ url_for('codigos_costo_importar') }}" class="btn btn-secondary">Importar Excel</a>
+{% endif %}
+<a href="{{ url_for('presupuesto') }}" class="btn btn-secondary">Ir a Presupuesto por Obra</a>
+{% endblock %}
+{% block content %}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-bd">
+    <form method="GET" style="display:flex;gap:10px;align-items:flex-end">
+      <div style="flex:1"><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Buscar código o descripción</label>
+        <input class="form-control" type="text" name="q" value="{{ search }}" placeholder="Ej: 1-02-020 o Planta de Asfalto"></div>
+      <button type="submit" class="btn btn-primary">Buscar</button>
+      {% if search %}<a href="{{ url_for('codigos_costo') }}" class="btn btn-secondary">Limpiar</a>{% endif %}
+    </form>
+  </div>
+</div>
+
+{% set tipo_colors = {
+  'MAQ - Maquinaria': '#2196F3',
+  'CMB - Combustibles': '#FF9800',
+  'MAT - Materiales': '#4CAF50',
+  'SUB - Subcontratos': '#9C27B0',
+  'ACR - Acarreos': '#795548',
+  'NOM - Nómina': '#E91E63',
+  'IND - Indirectos': '#607D8B'
+} %}
+
+{% set tipo_labels = {
+  '1': 'MAQUINARIA',
+  '2': 'COMBUSTIBLES',
+  '3': 'MATERIALES',
+  '4': 'SUBCONTRATOS',
+  '5': 'ACARREOS',
+  '6': 'NÓMINA',
+  '7': 'INDIRECTOS'
+} %}
+
+<div class="card">
+  <div class="card-hd"><h3>Códigos de costo</h3>
+    <span style="color:var(--mt);font-size:12px">{{ codigos|length }} registros</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="tbl" id="tbl-codigos">
+      <thead><tr>
+        <th style="width:120px">Código</th>
+        <th>Descripción</th>
+        <th style="width:160px">Tipo</th>
+        <th style="width:60px;text-align:center">Activo</th>
+        {% if user_perms.get('presupuesto',{}).get('editar') %}<th style="width:100px"></th>{% endif %}
+      </tr></thead>
+      <tbody>
+      {% set ns = namespace(current_grupo='') %}
+      {% for c in codigos %}
+        {% set grupo = c.nivel1 or '' %}
+        {% if grupo != ns.current_grupo and not search %}
+          {% set ns.current_grupo = grupo %}
+          <tr class="grupo-header" style="background:var(--s2);cursor:pointer" onclick="toggleGrupo('g{{ grupo }}')">
+            <td colspan="{% if user_perms.get('presupuesto',{}).get('editar') %}5{% else %}4{% endif %}" style="font-weight:700;font-size:13px;padding:10px 12px">
+              <span style="display:inline-block;width:20px;text-align:center;font-size:10px" id="ico-g{{ grupo }}">▼</span>
+              {{ grupo }} — {{ tipo_labels.get(grupo, '') }}
+            </td>
+          </tr>
+        {% endif %}
+        {% set es_padre = (not c.nivel2 and not c.nivel3) %}
+        {% set indent = 0 %}
+        {% if c.nivel2 and not c.nivel3 %}{% set indent = 1 %}{% endif %}
+        {% if c.nivel3 and not c.nivel4 %}{% set indent = 2 %}{% endif %}
+        {% if c.nivel4 and not c.nivel5 %}{% set indent = 3 %}{% endif %}
+        {% if c.nivel5 %}{% set indent = 4 %}{% endif %}
+      <tr class="fila-codigo g{{ grupo }}" {% if es_padre %}style="font-weight:600;background:rgba(0,0,0,.02)"{% endif %}>
+        <td style="font-family:monospace;font-size:12px;padding-left:{{ 12 + indent * 16 }}px">{{ c.codigo }}</td>
+        <td style="padding-left:{{ 8 + indent * 14 }}px;font-size:13px">{{ c.descripcion }}</td>
+        <td>
+          {% if c.tipo_costo %}
+          <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;color:#fff;background:{{ tipo_colors.get(c.tipo_costo, '#999') }}">{{ c.tipo_costo.split(' - ')[0] if ' - ' in (c.tipo_costo or '') else c.tipo_costo }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td style="text-align:center">{{ '✔' if c.activo else '✗' }}</td>
+        {% if user_perms.get('presupuesto',{}).get('editar') %}
+        <td style="display:flex;gap:4px">
+          <a href="{{ url_for('codigo_costo_editar', cid=c.id) }}" class="btn btn-secondary btn-sm">Editar</a>
+          <form method="POST" action="{{ url_for('codigo_costo_toggle', cid=c.id) }}" style="display:inline">
+            <button type="submit" class="btn btn-secondary btn-sm" style="font-size:10px">{{ 'Desact.' if c.activo else 'Activar' }}</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr><td colspan="5" style="text-align:center;padding:30px;color:var(--mt)">
+        Sin códigos de costo — importa el catálogo o crea uno nuevo
+      </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function toggleGrupo(cls) {
+  var filas = document.querySelectorAll('.' + cls);
+  var ico = document.getElementById('ico-' + cls);
+  var visible = filas.length > 0 && filas[0].style.display !== 'none';
+  filas.forEach(function(f) {
+    if (!f.classList.contains('grupo-header')) {
+      f.style.display = visible ? 'none' : '';
+    }
+  });
+  if (ico) ico.textContent = visible ? '▶' : '▼';
+}
+</script>
+{% endblock %}

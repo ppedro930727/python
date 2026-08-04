@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{{ emp.nombre }} {{ emp.apellido_paterno }} — ESMA{% endblock %}
+{% block page_title %}{{ emp.nombre }} {{ emp.apellido_paterno }} {{ emp.apellido_materno or '' }}{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('rrhh') }}">Recursos Humanos</a> · {{ emp.nombre }} {{ emp.apellido_paterno }}{% endblock %}
+{% block topbar_actions %}
+{% if user_perms.get('rrhh',{}).get('editar') %}
+<a href="{{ url_for('empleado_editar', eid=emp.id) }}" class="btn btn-secondary">Editar</a>
+{% if emp.activo %}
+<form method="POST" action="{{ url_for('empleado_baja', eid=emp.id) }}" style="display:inline" onsubmit="return confirm('Dar de baja a este empleado?')">
+  <input type="hidden" name="fecha_baja" value="">
+  <button type="submit" class="btn btn-secondary" style="color:var(--al)">Dar de baja</button>
+</form>
+{% else %}
+<form method="POST" action="{{ url_for('empleado_reactivar', eid=emp.id) }}" style="display:inline">
+  <button type="submit" class="btn btn-primary">Reactivar</button>
+</form>
+{% endif %}
+{% endif %}
+{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col" style="flex:1">
+    <div class="card">
+      <div class="card-hd"><h3>Datos personales</h3></div>
+      <div class="card-bd">
+        {% if emp.foto %}
+        <div style="text-align:center;margin-bottom:16px">
+          <img src="/uploads/{{ emp.foto }}" alt="Foto" style="max-width:120px;max-height:120px;border-radius:50%;object-fit:cover;border:2px solid var(--bd)">
+        </div>
+        {% endif %}
+        {% set campos = [
+          ('No. empleado', emp.numero_empleado), ('CURP', emp.curp), ('RFC', emp.rfc),
+          ('NSS', emp.nss), ('Fecha nacimiento', emp.fecha_nacimiento),
+          ('Telefono', emp.telefono), ('Email', emp.email),
+          ('Direccion', emp.direccion), ('Contacto emergencia', emp.contacto_emergencia),
+        ] %}
+        {% for label, val in campos %}
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bd);font-size:12px">
+          <span style="color:var(--mt)">{{ label }}</span><span>{{ val or '—' }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col" style="flex:1">
+    <div class="card">
+      <div class="card-hd"><h3>Datos laborales</h3></div>
+      <div class="card-bd">
+        {% set campos2 = [
+          ('Puesto', emp.puesto), ('Departamento', emp.departamento),
+          ('Obra asignada', emp.obra_nombre), ('Tipo contrato', emp.tipo_contrato),
+          ('Fecha ingreso', emp.fecha_ingreso), ('Fecha baja', emp.fecha_baja),
+          ('Estado', 'Activo' if emp.activo else 'Baja'),
+        ] %}
+        {% for label, val in campos2 %}
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bd);font-size:12px">
+          <span style="color:var(--mt)">{{ label }}</span><span>{{ val or '—' }}</span>
+        </div>
+        {% endfor %}
+        <div style="margin-top:16px;padding:12px;background:rgba(59,63,158,.06);border-radius:6px">
+          <div style="display:flex;justify-content:space-between;font-size:13px">
+            <span>Salario diario:</span><strong>${{ "%.2f"|format(emp.salario_diario|float) if emp.salario_diario else '—' }}</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:4px">
+            <span>Salario semanal:</span><strong>${{ "%.2f"|format(emp.salario_semanal|float) if emp.salario_semanal else '—' }}</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:8px;color:var(--mt)">
+            <span>Banco: {{ emp.banco or '—' }}</span><span>Cuenta: {{ emp.cuenta_banco or '—' }}</span>
+          </div>
+          {% if emp.clabe %}
+          <div style="font-size:11px;color:var(--mt);margin-top:4px">CLABE: {{ emp.clabe }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Asistencia reciente -->
+<div class="card">
+  <div class="card-hd"><h3>Asistencia reciente</h3></div>
+  <div class="card-bd">
+    {% if asistencia %}
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Entrada</th><th>Salida</th><th>Hrs normales</th><th>Hrs extra</th><th>Obs.</th></tr></thead>
+        <tbody>
+        {% for a in asistencia %}
+        {% set tipo_color = {'asistencia':'badge-ok','falta':'badge-dg','permiso':'badge-wn','incapacidad':'badge-al','vacaciones':'badge-ac','descanso':'badge-mt'} %}
+        <tr>
+          <td style="font-size:11px">{{ a.fecha }}</td>
+          <td><span class="badge {{ tipo_color.get(a.tipo,'badge-mt') }}">{{ a.tipo }}</span></td>
+          <td style="font-size:12px">{{ a.entrada or '—' }}</td>
+          <td style="font-size:12px">{{ a.salida or '—' }}</td>
+          <td style="text-align:center">{{ a.horas_normales or '—' }}</td>
+          <td style="text-align:center;color:var(--ac);font-weight:600">{{ a.horas_extra if a.horas_extra else '—' }}</td>
+          <td style="font-size:11px;color:var(--mt)">{{ a.observaciones or '' }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="text-align:center;color:var(--mt);padding:20px">Sin registros de asistencia en este periodo.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Historial de nomina -->
+<div class="card">
+  <div class="card-hd"><h3>Historial de nomina</h3></div>
+  <div class="card-bd">
+    {% if nominas %}
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Semana</th><th>Periodo</th><th>Dias</th><th>Hrs extra</th><th style="text-align:right">Base</th><th style="text-align:right">Extras</th><th style="text-align:right">Total</th><th>Estatus</th></tr></thead>
+        <tbody>
+        {% for n in nominas %}
+        {% set est_badge = {'borrador':'badge-mt','aprobada':'badge-wn','pagada':'badge-ok'} %}
+        <tr>
+          <td style="font-weight:600">{{ n.semana }}</td>
+          <td style="font-size:11px;color:var(--mt)">{{ n.fecha_inicio }} a {{ n.fecha_fin }}</td>
+          <td style="text-align:center">{{ n.dias_trabajados }}</td>
+          <td style="text-align:center">{{ "%.1f"|format(n.horas_extra|float) }}</td>
+          <td style="text-align:right">${{ "{:,.2f}".format(n.salario_base|float) }}</td>
+          <td style="text-align:right">${{ "{:,.2f}".format(n.pago_horas_extra|float) }}</td>
+          <td style="text-align:right;font-weight:700">${{ "{:,.2f}".format(n.total_pagar|float) }}</td>
+          <td><span class="badge {{ est_badge.get(n.estatus,'badge-mt') }}">{{ n.estatus }}</span></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="text-align:center;color:var(--mt);padding:20px">Sin registros de nomina.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

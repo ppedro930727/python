@@ -1,0 +1,81 @@
+MÓDULO NUEVO: PROVEEDORES + PRESUPUESTO / CÓDIGOS DE COSTO
+============================================================
+
+QUÉ TRAE
+--------
+1. Catálogo maestro de Proveedores (razón social, RFC, tipo, contacto,
+   datos bancarios) + evaluaciones de desempeño (calidad/entrega/precio/
+   servicio, 1-5). Reemplaza el texto libre de "proveedor" en OC por un
+   catálogo real (get_proveedores_oc() ahora prioriza este catálogo).
+
+2. Códigos de Costo (catálogo jerárquico tipo "1-02-020") + Presupuesto
+   por Obra (monto original/revisado, comprometido en OC, ejercido a la
+   fecha) + bitácora de Costos Directos (facturas). Import directo de
+   los formatos que ya usas:
+     - "Códigos de costo_Import_template GENERAL.xlsx"  → catálogo
+     - budget_details.csv (export de Procore)            → presupuesto
+     - direct_costs.csv (export de Procore)               → costos directos
+
+ARCHIVOS MODIFICADOS/NUEVOS
+----------------------------
+- database.py   → agregado: tablas + CRUD de proveedores/presupuesto,
+                   MODULOS_PERMISOS y _defaults_permisos() actualizados,
+                   get_proveedores_oc() mejorado, nueva get_proveedores_autofill().
+- app.py         → agregadas las rutas /proveedores... y /presupuesto...,
+                   más las llamadas de init de tablas al arrancar. Las rutas
+                   de OC (nueva/editar) ahora pasan proveedores_autofill.
+- templates/base.html → 2 links nuevos en el sidebar ("Control Financiero").
+- templates/orden_compra_form.html → el campo Proveedor ahora autocompleta
+  RFC, contacto, teléfono, email y condiciones de pago al elegir un
+  proveedor ya dado de alta en el catálogo (JS, sin recargar la página).
+- templates/proveedores.html, proveedor_form.html, proveedor_detalle.html
+- templates/presupuesto.html, presupuesto_importar.html
+- templates/codigos_costo.html, codigos_costo_importar.html
+
+CÓMO DESPLEGAR
+---------------
+1. Sube estos archivos al servidor reemplazando los actuales:
+   /var/www/html/database.py
+   /var/www/html/app.py
+   /var/www/html/templates/base.html
+   /var/www/html/templates/orden_compra_form.html
+   /var/www/html/templates/proveedores.html   (nuevo)
+   /var/www/html/templates/proveedor_form.html (nuevo)
+   /var/www/html/templates/proveedor_detalle.html (nuevo)
+   /var/www/html/templates/presupuesto.html (nuevo)
+   /var/www/html/templates/presupuesto_importar.html (nuevo)
+   /var/www/html/templates/codigos_costo.html (nuevo)
+   /var/www/html/templates/codigos_costo_importar.html (nuevo)
+
+2. Reinicia el servicio:  sudo systemctl restart esma.service
+   Las tablas nuevas (proveedores, proveedor_evaluaciones, codigos_costo,
+   presupuesto_obra, presupuesto_costos_directos) se crean solas al
+   arrancar (mismo patrón que ya usan requisiciones/OC — CREATE TABLE
+   IF NOT EXISTS, no requiere migración manual de SQL).
+
+3. Como estás logueado con rol admin, ya verás "Proveedores" y
+   "Presupuesto" en el sidebar de inmediato (admin tiene acceso total
+   por defecto). Para los demás roles, ve a /permisos y ajusta según
+   necesites (quedaron con defaults razonables: Control Interno/
+   Auditoría con lectura en ambos, Superintendente con lectura+alta en
+   Proveedores).
+
+CÓMO USARLO
+------------
+- Da de alta tus proveedores actuales en /proveedores/nuevo (puedes
+  copiar los datos de tus "ALTAS PROVEEDORES" Excel).
+- En /presupuesto/codigos/importar sube "Códigos de costo_Import_template
+  GENERAL.xlsx" UNA sola vez para poblar el catálogo (nivel 1 a 5).
+- En /presupuesto/importar, por cada obra, sube su budget_details.csv
+  y direct_costs.csv exportados de Procore. Puedes re-importar cuando
+  quieras: hace upsert, no duplica.
+- /presupuesto te muestra, por obra, presupuesto revisado vs
+  comprometido (OC) vs ejercido, con barra de avance por código de costo.
+
+SIGUIENTE PASO SUGERIDO (no incluido todavía)
+-----------------------------------------------
+- Enlazar automáticamente cada Orden de Compra/Requisición aprobada a
+  un código de costo, para que "oc_aprobadas" en presupuesto_obra se
+  actualice sola en vez de depender del import de budget_details.csv.
+- Módulo de Análisis de Compra, Caja Chica y Solicitud de Cancelación
+  de CFDI (quedaron pendientes de la lista original).

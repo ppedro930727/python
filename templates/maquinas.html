@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Equipos — ESMA{% endblock %}
+{% block page_title %}Equipos y Maquinaria{% endblock %}
+{% block breadcrumb %}Administración de recursos · Flota completa{% endblock %}
+{% block topbar_actions %}
+{% if ROLES_ORDEN.get(user.rol,0) >= ROLES_ORDEN.get('supervisor',0) %}
+<a href="{{ url_for('maquina_nueva') }}" class="btn btn-primary">+ Nuevo equipo</a>
+{% endif %}
+{% endblock %}
+{% block content %}
+<!-- Filtros -->
+<div class="card" style="margin-bottom:16px">
+  <div class="card-bd">
+    <form method="GET" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div style="flex:2;min-width:180px">
+        <label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Buscar</label>
+        <input class="form-control" name="q" value="{{ search }}" placeholder="ECO, nombre, marca, serie...">
+      </div>
+      <div style="min-width:160px">
+        <label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Clasificación</label>
+        <select class="form-control" name="clasificacion">
+          <option value="">Todas</option>
+          {% for c in clasifs %}
+          <option value="{{ c }}" {{ 'selected' if clasificacion==c }}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">Filtrar</button>
+      <a href="{{ url_for('maquinas') }}" class="btn btn-secondary">Limpiar</a>
+      <a href="{{ url_for('maquinas_exportar_excel', q=search, clasificacion=clasificacion) }}" class="btn btn-secondary" style="margin-left:auto">⬇ Descargar Excel</a>
+    </form>
+  </div>
+</div>
+<!-- Tabla -->
+<div class="card">
+  <div class="card-hd">
+    <h3>{{ maquinas|length }} equipos</h3>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr>
+        <th>ECO</th><th>Nombre / Tipo</th><th>Marca</th><th>Modelo</th><th>Serie</th>
+        <th>Horómetro</th><th>Combustible</th><th>Último mant.</th><th>Próximo mantenimiento</th><th>Obra</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for m in maquinas %}
+      <tr>
+        <td><span class="eco">{{ m.eco }}</span></td>
+        <td>{{ m.nombre_equipo or '—' }}<br>
+            <span style="font-size:10px;color:var(--mt)">{{ m.clasificacion or '' }}</span></td>
+        <td>{{ m.marca or '—' }}</td>
+        <td style="font-size:11px">{{ m.modelo or '—' }}</td>
+        <td style="font-size:10px;font-family:monospace;color:var(--mt)">{{ m.serie or '—' }}</td>
+        <td>{{ "%.1f"|format(m.horas_totales_horometro|float) if m.horas_totales_horometro else '—' }} h</td>
+        <td style="min-width:80px">
+          {% if m.nivel_combustible is not none and m.nivel_combustible != '' %}
+            {% set pct = m.nivel_combustible|float %}
+            {% set fuel_color = '#ef4444' if pct < 20 else ('#f97316' if pct < 40 else '#22c55e') %}
+            {% if m.capacidad_litros %}
+              {% set litros = (pct / 100 * m.capacidad_litros|float)|round(1) %}
+              <div style="display:flex;align-items:center;gap:5px">
+                <div style="flex:1;background:var(--bd);border-radius:4px;height:8px;overflow:hidden">
+                  <div style="width:{{ pct }}%;height:100%;background:{{ fuel_color }}"></div>
+                </div>
+                <span style="font-size:11px;font-weight:600;color:{{ fuel_color }}">{{ "%.0f"|format(litros) }} L</span>
+              </div>
+            {% else %}
+              <div style="display:flex;align-items:center;gap:5px">
+                <div style="flex:1;background:var(--bd);border-radius:4px;height:8px;overflow:hidden">
+                  <div style="width:{{ pct }}%;height:100%;background:{{ fuel_color }}"></div>
+                </div>
+                <span style="font-size:11px;font-weight:600;color:{{ fuel_color }}">{{ "%.0f"|format(pct) }}%</span>
+              </div>
+            {% endif %}
+          {% else %}
+            <span style="font-size:11px;color:var(--mt)">—</span>
+          {% endif %}
+        </td>
+        <td style="font-size:11px;color:var(--mt)">
+          {% if m.ultimo_mant %}
+            {{ "%.1f"|format(m.ultimo_mant.horometro|float) }} h<br>
+            <span style="font-size:10px">{{ m.ultimo_mant.fecha }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td style="min-width:170px">
+          {% set sm = m.sem_mant %}
+          {% if sm.sin_dato %}
+            <span style="font-size:11px;color:var(--mt)">Sin horómetro</span>
+          {% else %}
+            {% set color = '#ef4444' if sm.nivel=='vencido' else ('#f97316' if sm.nivel=='proximo' else ('#f59e0b' if sm.nivel=='atencion' else '#22c55e')) %}
+            {% set texto = 'Mantenimiento vencido' if sm.nivel=='vencido' else ('Próximo mantenimiento' if sm.nivel=='proximo' else ('Atención' if sm.nivel=='atencion' else 'En regla')) %}
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+              <span style="width:8px;height:8px;border-radius:50%;background:{{ color }};display:inline-block;flex-shrink:0"></span>
+              <span style="font-size:11px;font-weight:600;color:{{ color }}">{{ texto }}</span>
+            </div>
+            <div style="background:var(--bd);border-radius:4px;height:6px;overflow:hidden;margin-bottom:3px">
+              <div style="width:{{ sm.pct }}%;height:100%;background:{{ color }}"></div>
+            </div>
+            <div style="font-size:10px;color:var(--mt)">
+              {% if m.ultimo_mant %}{% set proximo_h = m.ultimo_mant.horometro|float + 250 %}{% else %}{% set proximo_h = 250.0 %}{% endif %}
+              Próx: {{ "%.1f"|format(proximo_h) }} h
+              ({% if sm.nivel == 'vencido' %}{{ sm.horas_restantes|abs }} h excedidas{% else %}faltan {{ sm.horas_restantes }} h{% endif %})
+            </div>
+          {% endif %}
+        </td>
+        <td><span style="font-size:11px;color:var(--mt)">{{ m.obra_nombre or '—' }}</span></td>
+        <td style="white-space:nowrap">
+          <a href="{{ url_for('maquina_detalle', eco=m.eco) }}" class="btn btn-secondary btn-sm">Ver</a>
+          {% if user_perms.get('equipos', {}).get('editar') %}
+          <a href="{{ url_for('maquina_editar', eco=m.eco) }}" class="btn btn-secondary btn-sm">Editar</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="11" style="text-align:center;padding:30px;color:var(--mt)">Sin equipos registrados</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

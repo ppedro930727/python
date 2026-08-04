@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Nueva remisión — ESMA{% endblock %}
+{% block page_title %}Planta de Asfalto · Nueva remisión{% endblock %}
+{% block breadcrumb %}El neto de recibo y la diferencia se calculan solos{% endblock %}
+{% block content %}
+<div class="card"><div class="card-bd">
+  <form method="POST">
+    <input type="hidden" name="id_obra" value="{{ obr }}">
+    <div class="row">
+      <div class="col form-group" style="min-width:130px"><label>Producto</label>
+        <select class="form-control" name="producto">
+          <option value="asfalto">Asfalto</option><option value="emulsion">Emulsión</option></select></div>
+      <div class="col form-group" style="min-width:150px"><label>Proveedor</label>
+        <input class="form-control" name="proveedor" value="ERGON"></div>
+      <div class="col form-group" style="min-width:140px"><label>Fecha llegada</label>
+        <input class="form-control" type="date" name="fecha_llegada" value="{{ hoy }}"></div>
+      <div class="col form-group" style="min-width:140px"><label>Fecha salida</label>
+        <input class="form-control" type="date" name="fecha_salida"></div>
+    </div>
+    <div class="row">
+      <div class="col form-group" style="min-width:140px"><label>No. Remisión / Factura</label>
+        <input class="form-control" name="remision"></div>
+      <div class="col form-group" style="min-width:140px"><label>Certificado de calidad</label>
+        <input class="form-control" name="certificado"></div>
+      <div class="col form-group" style="min-width:130px"><label>Placas tracto</label>
+        <input class="form-control" name="placas_tracto"></div>
+      <div class="col form-group" style="min-width:130px"><label>Placas tanque</label>
+        <input class="form-control" name="placas_tanque"></div>
+    </div>
+    <div style="padding:10px 0 6px;font-size:12px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.5px">Pesos del proveedor (envío)</div>
+    <div class="row">
+      <div class="col form-group"><label>Peso bruto envío (tn)</label>
+        <input class="form-control" type="number" step="0.01" name="peso_bruto_envio" id="pbe" oninput="calcNeto()"></div>
+      <div class="col form-group"><label>Tara envío (tn)</label>
+        <input class="form-control" type="number" step="0.01" name="tara_envio" id="te" oninput="calcNeto()"></div>
+      <div class="col form-group"><label>Peso neto envío (tn) <span style="color:var(--mt);font-weight:400">(auto)</span></label>
+        <input class="form-control" type="number" step="0.01" name="peso_neto_envio" id="pne" readonly style="background:var(--s2)"></div>
+    </div>
+    <div style="padding:10px 0 6px;font-size:12px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.5px">Pesos ESMA (recibo)</div>
+    <div class="row">
+      <div class="col form-group"><label>Peso bruto recibo (tn)</label>
+        <input class="form-control" type="number" step="0.01" name="peso_bruto_recibo" id="pbr" required oninput="calcNeto()"></div>
+      <div class="col form-group"><label>Tara recibo (tn)</label>
+        <input class="form-control" type="number" step="0.01" name="tara_recibo" id="tr" required oninput="calcNeto()"></div>
+      <div class="col form-group"><label>Neto recibo (tn) <span style="color:var(--mt);font-weight:400">(auto)</span></label>
+        <input class="form-control" type="text" id="pnr" readonly disabled style="background:var(--s2)"></div>
+      <div class="col form-group"><label>Diferencia (tn) <span style="color:var(--mt);font-weight:400">(auto)</span></label>
+        <input class="form-control" type="text" id="dif" readonly disabled style="background:var(--s2)"></div>
+    </div>
+    <div style="padding:10px 0 6px;font-size:12px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.5px">Precio (para cálculo de pago)</div>
+    <div class="row">
+      <div class="col form-group" style="max-width:250px"><label>Precio por tonelada ($)</label>
+        <input class="form-control" type="number" step="0.01" name="precio_tonelada" placeholder="Ej: 25000.00"></div>
+    </div>
+    <button class="btn btn-primary" type="submit">Guardar remisión</button>
+    <a href="{{ url_for('planta_remisiones', obra=obr) }}" class="btn btn-secondary">Cancelar</a>
+  </form>
+</div></div>
+<script>
+function calcNeto(){
+  var pbe=parseFloat(document.getElementById('pbe').value)||0;
+  var te=parseFloat(document.getElementById('te').value)||0;
+  var neto_envio=pbe>0&&te>0?(pbe-te).toFixed(2):'';
+  document.getElementById('pne').value=neto_envio;
+  var pbr=parseFloat(document.getElementById('pbr').value)||0;
+  var tr=parseFloat(document.getElementById('tr').value)||0;
+  var neto_recibo=pbr>0&&tr>0?(pbr-tr).toFixed(2):'—';
+  document.getElementById('pnr').value=neto_recibo;
+  if(neto_envio&&neto_recibo!=='—'){
+    var dif=(parseFloat(neto_recibo)-parseFloat(neto_envio)).toFixed(2);
+    document.getElementById('dif').value=dif+' tn';
+  }else{document.getElementById('dif').value='—';}
+}
+</script>
+{% endblock %}

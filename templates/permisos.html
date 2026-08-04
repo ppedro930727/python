@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}Permisos por Rol — ESMA{% endblock %}
+{% block page_title %}Permisos por Rol{% endblock %}
+{% block breadcrumb %}Sistema · Control de acceso CRUD{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('reportes_obra_permisos') }}" class="btn btn-primary">🔐 Permisos por obra</a>
+{% endblock %}
+{% block content %}
+
+<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+
+  <!-- Panel izquierdo: selector de rol -->
+  <div style="width:220px;flex-shrink:0">
+    <div class="card">
+      <div class="card-hd"><h3 style="font-size:13px;margin:0">Roles</h3></div>
+      <div style="padding:8px 0">
+        {% for rol in roles %}
+        <a href="{{ url_for('permisos', rol=rol) }}"
+           style="display:flex;align-items:center;justify-content:space-between;
+                  padding:8px 14px;font-size:13px;text-decoration:none;
+                  {% if rol == rol_sel %}background:var(--ac);color:#fff;{% else %}color:var(--tx);{% endif %}
+                  border-radius:6px;margin:2px 6px">
+          <span>
+            {% if rol == 'admin' %}👑
+            {% elif rol == 'supervisor' %}🔧
+            {% elif rol == 'operador' %}🚜
+            {% elif rol == 'reportes' %}📊
+            {% elif rol == 'cliente' %}👤
+            {% else %}🏷{% endif %}
+            {{ rol|rol_label }}
+          </span>
+          {% if rol == 'admin' %}<span style="font-size:10px;opacity:.7">Todo</span>{% endif %}
+          {% if rol not in roles_base and rol != 'admin' %}
+          <form method="POST" action="{{ url_for('rol_eliminar', codigo=rol) }}" style="margin:0"
+                onsubmit="return confirm('¿Eliminar el rol «{{ rol|rol_label }}»? Se borrarán sus permisos.')">
+            <button type="submit" style="background:none;border:none;cursor:pointer;font-size:12px;color:{% if rol == rol_sel %}#fca5a5{% else %}var(--dg){% endif %};padding:0 4px" title="Eliminar rol">✕</button>
+          </form>
+          {% endif %}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Crear nuevo rol -->
+    <div class="card" style="margin-top:12px">
+      <div class="card-hd"><h3 style="font-size:12px;margin:0">+ Crear nuevo rol</h3></div>
+      <div class="card-bd" style="padding:12px 14px">
+        <form method="POST" action="{{ url_for('rol_nuevo') }}">
+          <div class="form-group" style="margin-bottom:10px">
+            <label style="font-size:11px">Nombre visible</label>
+            <input class="form-control" name="nombre" placeholder="Ej: Jefe de Taller" required style="font-size:12px">
+          </div>
+          <div class="form-group" style="margin-bottom:10px">
+            <label style="font-size:11px">Código interno <span style="color:var(--mt)">(sin espacios, minúsculas)</span></label>
+            <input class="form-control" name="codigo" placeholder="Ej: jefe_taller" required
+                   pattern="[a-z0-9_]+" style="font-size:12px"
+                   oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'')">
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="width:100%">Crear rol</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-bd" style="font-size:11px;color:var(--mt);line-height:1.6">
+        <strong style="color:var(--tx)">Leyenda</strong><br>
+        ✏️ Crear · 👁 Leer · 🔄 Editar · 🗑 Eliminar<br><br>
+        El rol <strong>Admin</strong> siempre tiene acceso total y no es editable.<br><br>
+        Los roles con 🏷 son personalizados y se pueden eliminar.
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel derecho: tabla de permisos -->
+  <div style="flex:1;min-width:500px">
+    <div class="card">
+      <div class="card-hd" style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="margin:0">
+          Permisos: <span style="color:var(--ac)">{{ rol_sel|rol_label }}</span>
+        </h3>
+        {% if rol_sel != 'admin' %}
+        <button form="form-permisos" type="submit" class="btn btn-primary">Guardar cambios</button>
+        {% endif %}
+      </div>
+
+      {% if rol_sel == 'admin' %}
+      <div class="card-bd" style="text-align:center;padding:30px;color:var(--mt)">
+        👑 El rol <strong>Admin</strong> tiene acceso total a todos los módulos y no puede modificarse.
+      </div>
+      {% else %}
+      <form id="form-permisos" method="POST" action="{{ url_for('permisos') }}">
+        <input type="hidden" name="rol" value="{{ rol_sel }}">
+
+        <div style="overflow-x:auto">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th style="min-width:180px">Módulo</th>
+                <th style="text-align:center;min-width:70px">✏️ Crear</th>
+                <th style="text-align:center;min-width:70px">👁 Leer</th>
+                <th style="text-align:center;min-width:70px">🔄 Editar</th>
+                <th style="text-align:center;min-width:70px">🗑 Eliminar</th>
+                <th style="text-align:center;min-width:80px">Todo</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for modulo, label in modulos %}
+            {% set mp = perms.get(modulo, {}) %}
+            <tr>
+              <td style="font-weight:600;font-size:13px">{{ label }}</td>
+              {% for accion in acciones %}
+              <td style="text-align:center">
+                <input type="checkbox" name="{{ modulo }}_{{ accion }}" id="chk-{{ modulo }}-{{ accion }}"
+                       {% if mp.get(accion) %}checked{% endif %}
+                       onchange="syncTotal('{{ modulo }}')"
+                       style="width:16px;height:16px;accent-color:var(--ac);cursor:pointer">
+              </td>
+              {% endfor %}
+              <td style="text-align:center">
+                {% set todo = mp.get('crear') and mp.get('leer') and mp.get('editar') and mp.get('eliminar') %}
+                <input type="checkbox" id="chk-{{ modulo }}-todo"
+                       {% if todo %}checked{% endif %}
+                       onchange="toggleTodo('{{ modulo }}', this.checked)"
+                       style="width:16px;height:16px;accent-color:#2E3192;cursor:pointer">
+              </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div style="padding:14px 20px;border-top:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center">
+          <div style="display:flex;gap:10px">
+            <button type="button" onclick="toggleTodos(true)" class="btn btn-secondary btn-sm">✅ Activar todo</button>
+            <button type="button" onclick="toggleTodos(false)" class="btn btn-secondary btn-sm">❌ Desactivar todo</button>
+          </div>
+          <button type="submit" class="btn btn-primary">Guardar cambios</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+
+    <!-- Resumen comparativo -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-hd"><h3 style="margin:0;font-size:13px">Resumen comparativo de roles</h3></div>
+      <div style="overflow-x:auto">
+        <table class="tbl" style="font-size:11px">
+          <thead>
+            <tr>
+              <th>Módulo</th>
+              {% for rol in roles %}
+              <th style="text-align:center" colspan="4">{{ rol|rol_label }}</th>
+              {% endfor %}
+            </tr>
+            <tr>
+              <th></th>
+              {% for rol in roles %}
+              <th style="text-align:center;font-size:10px;color:var(--mt)">C</th>
+              <th style="text-align:center;font-size:10px;color:var(--mt)">L</th>
+              <th style="text-align:center;font-size:10px;color:var(--mt)">E</th>
+              <th style="text-align:center;font-size:10px;color:var(--mt)">D</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+          {% for modulo, label in modulos %}
+          <tr>
+            <td style="font-weight:600">{{ label }}</td>
+            {% for rol in roles %}
+            {% set rp = todos.get(rol, {}).get(modulo, {}) %}
+            {% if rol == 'admin' %}
+              <td style="text-align:center;color:#2E3192">✓</td>
+              <td style="text-align:center;color:#2E3192">✓</td>
+              <td style="text-align:center;color:#2E3192">✓</td>
+              <td style="text-align:center;color:#2E3192">✓</td>
+            {% else %}
+              <td style="text-align:center">{% if rp.get('crear') %}<span style="color:#2E3192">✓</span>{% else %}<span style="color:var(--bd)">—</span>{% endif %}</td>
+              <td style="text-align:center">{% if rp.get('leer') %}<span style="color:#2E3192">✓</span>{% else %}<span style="color:var(--bd)">—</span>{% endif %}</td>
+              <td style="text-align:center">{% if rp.get('editar') %}<span style="color:#2E3192">✓</span>{% else %}<span style="color:var(--bd)">—</span>{% endif %}</td>
+              <td style="text-align:center">{% if rp.get('eliminar') %}<span style="color:#2E3192">✓</span>{% else %}<span style="color:var(--bd)">—</span>{% endif %}</td>
+            {% endif %}
+            {% endfor %}
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div style="padding:8px 16px;font-size:10px;color:var(--mt)">C = Crear · L = Leer · E = Editar · D = Eliminar</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function syncTotal(modulo) {
+  var acciones = ['crear','leer','editar','eliminar'];
+  var todo = acciones.every(function(a){ var el=document.getElementById('chk-'+modulo+'-'+a); return el && el.checked; });
+  var chkTodo = document.getElementById('chk-'+modulo+'-todo');
+  if (chkTodo) chkTodo.checked = todo;
+}
+
+function toggleTodo(modulo, checked) {
+  ['crear','leer','editar','eliminar'].forEach(function(a) {
+    var chk = document.getElementById('chk-'+modulo+'-'+a);
+    if (chk) chk.checked = checked;
+  });
+}
+
+function toggleTodos(checked) {
+  document.querySelectorAll('#form-permisos input[type=checkbox]').forEach(function(chk) {
+    chk.checked = checked;
+  });
+}
+</script>
+{% endblock %}

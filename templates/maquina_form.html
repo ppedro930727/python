@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}{{ accion }} Equipo — ESMA{% endblock %}
+{% block page_title %}{{ accion }} Equipo{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('maquinas') }}">Equipos</a> · {{ accion }}{% endblock %}
+{% block content %}
+{% if not maq %}
+<!-- Importación masiva por Excel -->
+<div class="card" style="margin-bottom:20px">
+  <div class="card-hd"><h3>Importar equipos desde Excel</h3></div>
+  <div class="card-bd">
+    <form method="POST" action="{{ url_for('maquinas_importar_excel') }}" enctype="multipart/form-data"
+          style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1;min-width:220px">
+        <label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Archivo Excel (.xlsx)</label>
+        <input class="form-control" type="file" name="archivo_excel" accept=".xlsx,.xls" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Importar equipos</button>
+    </form>
+    <div style="margin-top:10px;font-size:12px;color:var(--mt)">
+      <strong>Columnas esperadas:</strong> ECO (obligatorio), Nombre del equipo, Proveedor, Marca, Modelo, Serie, Año, Clasificación, Cantidad, Ubicación.<br>
+      Los equipos con ECO o Serie que ya existan serán omitidos automáticamente.
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card" style="max-width:720px">
+  <div class="card-hd"><h3>Datos del equipo</h3></div>
+  <div class="card-bd">
+    <form method="POST" enctype="multipart/form-data">
+      {% set readonly = '' if (es_admin is defined and es_admin) else 'disabled' %}
+      <div class="row">
+        <div class="col">
+          <div class="form-group">
+            <label>Código ECO *</label>
+            <input class="form-control" name="eco" value="{{ maq.eco if maq else '' }}"
+                   required {{ 'readonly' if maq }} placeholder="EXC-001" {{ readonly }}>
+          </div>
+        </div>
+        <div class="col">
+          <div class="form-group">
+            <label>Proveedor</label>
+            <input class="form-control" name="proveedor" value="{{ maq.proveedor if maq else 'ESMA' }}" {{ readonly }}>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Nombre del equipo / maquinaria *</label>
+        <input class="form-control" name="nombre_equipo" value="{{ maq.nombre_equipo if maq else '' }}" required placeholder="EXCAVADORA" {{ readonly }}>
+      </div>
+      <div class="row">
+        <div class="col">
+          <div class="form-group">
+            <label>Marca</label>
+            <input class="form-control" name="marca" value="{{ maq.marca if maq else '' }}" placeholder="VOLVO" {{ readonly }}>
+          </div>
+        </div>
+        <div class="col">
+          <div class="form-group">
+            <label>Modelo</label>
+            <input class="form-control" name="modelo" value="{{ maq.modelo if maq else '' }}" placeholder="EC350DL" {{ readonly }}>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <div class="form-group">
+            <label>Número de serie</label>
+            <input class="form-control" name="serie" value="{{ maq.serie if maq else '' }}" {{ readonly }}>
+          </div>
+        </div>
+        <div class="col">
+          <div class="form-group">
+            <label>Año</label>
+            <input class="form-control" type="number" name="anio" value="{{ maq.anio if maq else '' }}" placeholder="2023" {{ readonly }}>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <div class="form-group">
+            <label>Clasificación</label>
+            <input class="form-control" name="clasificacion" value="{{ maq.clasificacion if maq else '' }}" placeholder="Propia / Gremial" {{ readonly }}>
+          </div>
+        </div>
+        <div class="col">
+          <div class="form-group">
+            <label>Cantidad</label>
+            <input class="form-control" type="number" name="cantidad" value="{{ maq.cantidad if maq else 1 }}" min="1" {{ readonly }}>
+          </div>
+        </div>
+        <div class="col">
+          <div class="form-group">
+            <label>Obra asignada</label>
+            <select class="form-control" name="id_obra" {{ readonly }}>
+              <option value="">— Ninguna —</option>
+              {% for o in obras %}
+              <option value="{{ o.id }}" {{ 'selected' if maq and maq.id_obra==o.id }}>{{ o.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <div class="form-group">
+            <label>Ubicación actual</label>
+            <input class="form-control" name="ubicacion" value="{{ maq.ubicacion if maq else '' }}" placeholder="Palmillas - Querétaro">
+          </div>
+        </div>
+        <div class="col">
+          <div class="form-group">
+            <label>Capacidad del tanque (litros)</label>
+            <input class="form-control" type="number" step="0.01" name="capacidad_litros" value="{{ maq.cap_estado if maq and maq.cap_estado else (maq.capacidad_litros if maq and maq.capacidad_litros else '') }}" placeholder="Ej: 400.00">
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Link Google Maps</label>
+        <input class="form-control" name="link_ubicacion" value="{{ maq.link_ubicacion if maq else '' }}" placeholder="https://maps.google.com/...">
+      </div>
+      <div class="form-group">
+        <label>Foto del equipo</label>
+        {% if maq and maq.foto %}
+        <div style="margin-bottom:10px">
+          <img src="/uploads/{{ maq.foto }}" alt="Foto {{ maq.eco }}" style="max-width:200px;max-height:150px;border-radius:8px;border:1px solid var(--bd)">
+          <div style="margin-top:6px">
+            <label style="font-size:12px;color:var(--mt);cursor:pointer">
+              <input type="checkbox" name="eliminar_foto" value="1"> Eliminar foto actual
+            </label>
+          </div>
+        </div>
+        {% endif %}
+        <input class="form-control" type="file" name="foto" accept="image/*">
+        <small style="color:var(--mt)">Formatos: JPG, PNG, WEBP. Se reemplaza la foto anterior si subes una nueva.</small>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button type="submit" class="btn btn-primary">{{ accion }} equipo</button>
+        <a href="{{ url_for('maquinas') }}" class="btn btn-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if maq %}
+<div class="card" style="max-width:720px;margin-top:20px">
+  <div class="card-hd"><h3>Documentos adjuntos del equipo</h3></div>
+  <div class="card-bd">
+    <!-- Listado de adjuntos existentes -->
+    {% if adjuntos %}
+    <div style="margin-bottom:16px">
+      {% for doc in adjuntos %}
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd)">
+        <span style="font-size:22px">📄</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ doc.nombre }}</div>
+          <div style="font-size:10px;color:var(--mt)">Subido: {{ doc.subido_en }} — {{ doc.subido_por_nombre or '' }}</div>
+        </div>
+        <a href="{{ url_for('vista_documento', did=doc.id) }}" target="_blank" class="btn btn-secondary btn-sm" title="Ver">👁 Ver</a>
+        <a href="{{ url_for('descargar_documento', did=doc.id) }}" class="btn btn-secondary btn-sm" title="Descargar">⬇</a>
+        <form method="POST" action="{{ url_for('eliminar_documento', did=doc.id) }}" style="margin:0" onsubmit="return confirm('¿Eliminar este documento?')">
+          <button type="submit" class="btn btn-secondary btn-sm" title="Eliminar" style="color:#e53e3e">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:var(--mt);font-size:13px;margin-bottom:14px">Sin documentos adjuntos.</p>
+    {% endif %}
+
+    <!-- Formulario para subir nuevos adjuntos -->
+    <form method="POST" action="{{ url_for('maquina_adjunto_subir', eco=maq.eco) }}" enctype="multipart/form-data">
+      <div class="form-group">
+        <label>Subir archivos (PDF, imágenes, Excel...)</label>
+        <input class="form-control" type="file" name="adjuntos" multiple accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx">
+        <small style="color:var(--mt)">Puedes seleccionar varios archivos a la vez.</small>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button type="submit" class="btn btn-primary">Subir adjuntos</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card" style="max-width:720px;margin-top:20px">
+  <div class="card-hd"><h3>Registrar mantenimiento</h3></div>
+  <div class="card-bd">
+    <form method="POST" action="{{ url_for('mantenimiento_nuevo', eco=maq.eco) }}">
+      <div class="row">
+        <div class="col">
+          <div class="form-group">
+            <label>Fecha</label>
+            <input class="form-control" type="date" name="fecha" id="mant-fecha" required>
+          </div>
+        </div>
+        <div class="col">
+          <div class="form-group">
+            <label>Hora</label>
+            <input class="form-control" type="time" name="hora" id="mant-hora" required>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Horómetro al momento del mantenimiento</label>
+        <input class="form-control" type="number" step="0.1" name="horometro"
+               value="{{ '%.1f'|format(maq.horas_totales_horometro|float) if maq.horas_totales_horometro else '' }}" required>
+        <small style="color:var(--mt)">Se precarga con el horómetro actual del equipo; puedes ajustarlo si es necesario.</small>
+      </div>
+      <div class="form-group">
+        <label>Descripción del mantenimiento *</label>
+        <textarea class="form-control" name="descripcion" rows="3" required
+                  placeholder="Ej. Cambio de aceite y filtros, revisión de frenos, etc."></textarea>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button type="submit" class="btn btn-primary">Registrar mantenimiento</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(function(){
+  var now = new Date();
+  var pad = function(n){ return n.toString().padStart(2,'0'); };
+  var fecha = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());
+  var hora  = pad(now.getHours())+':'+pad(now.getMinutes());
+  var fEl = document.getElementById('mant-fecha');
+  var hEl = document.getElementById('mant-hora');
+  if (fEl && !fEl.value) fEl.value = fecha;
+  if (hEl && !hEl.value) hEl.value = hora;
+})();
+</script>
+{% endif %}
+{% endblock %}

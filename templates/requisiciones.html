@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Requisiciones — ESMA{% endblock %}
+{% block page_title %}Requisiciones Semanales{% endblock %}
+{% block breadcrumb %}Control Interno · Requerimientos de obra{% endblock %}
+{% block topbar_actions %}
+{% if user_perms.get('requisiciones',{}).get('crear') %}
+<a href="{{ url_for('requisicion_nueva') }}" class="btn btn-primary">+ Nueva Requisicion</a>
+<a href="{{ url_for('requisicion_importar') }}" class="btn btn-secondary">Importar Excel</a>
+{% endif %}
+<a href="{{ url_for('requisiciones_exportar_excel', obra=obra_filtro, empresa=empresa_filtro, estatus=estatus_filtro) }}" class="btn btn-secondary">Exportar Excel</a>
+{% endblock %}
+{% block content %}
+
+<!-- KPIs -->
+{% if kpis %}
+<div class="row" style="margin-bottom:16px">
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ kpis.total or 0 }}</div>
+    <div class="kpi-sm-lbl">Total requisiciones</div>
+  </div></div>
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ kpis.enviados or 0 }}</div>
+    <div class="kpi-sm-lbl">Pendientes</div>
+  </div></div>
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ kpis.aprobados or 0 }}</div>
+    <div class="kpi-sm-lbl">Aprobados</div>
+  </div></div>
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">${{ "{:,.0f}".format(kpis.suma_solicitado|float) }}</div>
+    <div class="kpi-sm-lbl">Solicitado</div>
+  </div></div>
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">${{ "{:,.0f}".format(kpis.suma_autorizado|float) }}</div>
+    <div class="kpi-sm-lbl">Autorizado</div>
+  </div></div>
+</div>
+{% endif %}
+
+<!-- Filtros -->
+<div class="card" style="margin-bottom:16px">
+  <div class="card-bd">
+    <form method="GET" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Obra</label>
+        <select class="form-control" name="obra">
+          <option value="">Todas</option>
+          {% for o in obras %}<option value="{{ o.id }}" {{ 'selected' if obra_filtro==o.id|string }}>{{ o.nombre }}</option>{% endfor %}
+        </select></div>
+      <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Empresa</label>
+        <select class="form-control" name="empresa">
+          <option value="">Todas</option>
+          <option value="ESMA" {{ 'selected' if empresa_filtro=='ESMA' }}>ESMA</option>
+          <option value="GREMIAL" {{ 'selected' if empresa_filtro=='GREMIAL' }}>GREMIAL</option>
+        </select></div>
+      <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Estatus</label>
+        <select class="form-control" name="estatus">
+          <option value="">Todos</option>
+          <option value="borrador" {{ 'selected' if estatus_filtro=='borrador' }}>Borrador</option>
+          <option value="enviado" {{ 'selected' if estatus_filtro=='enviado' }}>Enviado</option>
+          <option value="aprobado" {{ 'selected' if estatus_filtro=='aprobado' }}>Aprobado</option>
+          <option value="rechazado" {{ 'selected' if estatus_filtro=='rechazado' }}>Rechazado</option>
+        </select></div>
+      <button type="submit" class="btn btn-primary">Filtrar</button>
+      <a href="{{ url_for('requisiciones') }}" class="btn btn-secondary">Limpiar</a>
+    </form>
+  </div>
+</div>
+
+<!-- Tabla -->
+<div class="card">
+  <div class="card-hd"><h3>Requerimientos semanales</h3>
+    <span style="color:var(--mt);font-size:12px">{{ requisiciones|length }} registros</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr>
+        <th>Semana</th><th>Empresa</th><th>Obra</th><th style="text-align:right">Solicitado</th>
+        <th style="text-align:right">Autorizado</th><th>Estatus</th><th>Fecha</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for r in requisiciones %}
+      {% set est_badge = {'borrador':'badge-mt','enviado':'badge-wn','aprobado':'badge-ok','rechazado':'badge-dg'} %}
+      <tr>
+        <td style="font-weight:600">{{ r.semana or r.semana_num or '—' }}</td>
+        <td><span class="badge badge-ac">{{ r.empresa }}</span></td>
+        <td style="font-size:12px">{{ r.obra_nombre or '—' }}</td>
+        <td style="text-align:right">${{ "{:,.2f}".format(r.total_solicitado|float) }}</td>
+        <td style="text-align:right;font-weight:700">${{ "{:,.2f}".format(r.total_autorizado|float) }}</td>
+        <td><span class="badge {{ est_badge.get(r.estatus,'badge-mt') }}">{{ r.estatus }}</span></td>
+        <td style="font-size:11px;color:var(--mt)">{{ r.creado_en }}</td>
+        <td><a href="{{ url_for('requisicion_detalle', rid=r.id) }}" class="btn btn-secondary btn-sm">Ver</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--mt)">Sin requisiciones registradas</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

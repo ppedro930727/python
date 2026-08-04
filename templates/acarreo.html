@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Reportes 360 · Acarreo — ESMA{% endblock %}
+{% block page_title %}Reportes 360 · Acarreo de materiales{% endblock %}
+{% block breadcrumb %}Herramientas esenciales · Viajes vs Pagado{% endblock %}
+{% block topbar_actions %}
+{% endblock %}
+
+{% block content %}
+<div class="r360-tabs">
+  <a href="{{ url_for('combustible') }}" class="r360-tab">⛽ Combustible</a>
+</div>
+
+<!-- Filtros -->
+<form method="GET" class="row" style="margin-bottom:16px;align-items:flex-end">
+  <div class="col" style="max-width:220px"><div class="form-group" style="margin-bottom:0">
+    <label>Obra</label>
+    <select class="form-control" name="obra" onchange="this.form.submit()">
+      <option value="">Todas las obras</option>
+      {% for o in obras %}<option value="{{ o.id }}" {{ 'selected' if obr==o.id|string }}>{{ o.nombre }}</option>{% endfor %}
+    </select>
+  </div></div>
+  <div class="col" style="max-width:200px"><div class="form-group" style="margin-bottom:0">
+    <label>Semana</label>
+    <select class="form-control" name="semana" onchange="this.form.submit()">
+      <option value="">Todas</option>
+      {% for s in semanas %}<option value="{{ s }}" {{ 'selected' if sem==s }}>{{ s }}</option>{% endfor %}
+    </select>
+  </div></div>
+</form>
+
+<!-- KPIs -->
+<div class="row" style="margin-bottom:20px">
+  <div class="col" style="min-width:150px"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ kpis.total_viajes or 0 }}</div>
+    <div class="kpi-sm-lbl">Viajes registrados</div>
+  </div></div>
+  <div class="col" style="min-width:150px"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ "{:,.1f}".format(kpis.total_m3|float) }} <span style="font-size:12px">m³</span></div>
+    <div class="kpi-sm-lbl">Volumen acarreado</div>
+  </div></div>
+  <div class="col" style="min-width:150px"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ kpis.materiales or 0 }}</div>
+    <div class="kpi-sm-lbl">Materiales distintos</div>
+  </div></div>
+  <div class="col" style="min-width:150px"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ kpis.camiones or 0 }}</div>
+    <div class="kpi-sm-lbl">Camiones (placas)</div>
+  </div></div>
+</div>
+
+<div class="row">
+  <!-- Captura de viaje -->
+  <div class="col" style="flex:1;min-width:320px">
+    <div class="card">
+      <div class="card-hd"><h3>Registrar viaje</h3></div>
+      <div class="card-bd">
+        <form method="POST" action="{{ url_for('acarreo_nuevo') }}">
+          <div class="form-group"><label>Obra</label>
+            <select class="form-control" name="obra_id">
+              <option value="">— Sin asignar —</option>
+              {% for o in obras %}<option value="{{ o.id }}">{{ o.nombre }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="row">
+            <div class="col"><div class="form-group"><label>Semana *</label>
+              <input class="form-control" name="semana" required placeholder="SEM 27" value="{{ sem }}"></div></div>
+            <div class="col"><div class="form-group"><label>Fecha *</label>
+              <input class="form-control" type="date" name="fecha" required></div></div>
+          </div>
+          <div class="form-group"><label>Material *</label>
+            <select class="form-control" name="material" required>
+              {% for m in materiales %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="row">
+            <div class="col"><div class="form-group"><label>Placa del camión</label>
+              <input class="form-control" name="placa" placeholder="GF-1002-C"></div></div>
+            <div class="col"><div class="form-group"><label>Volumen (m³) *</label>
+              <input class="form-control" type="number" step="0.01" name="volumen" required placeholder="28.5"></div></div>
+          </div>
+          <div class="row">
+            <div class="col"><div class="form-group"><label>Origen</label>
+              <input class="form-control" name="origen" placeholder="El Sauz"></div></div>
+            <div class="col"><div class="form-group"><label>Destino</label>
+              <input class="form-control" name="destino" placeholder="Patio Planta ESMA"></div></div>
+          </div>
+          <div class="form-group"><label>Folio ESMA</label>
+            <input class="form-control" name="folio_esma" placeholder="Opcional"></div>
+          <button type="submit" class="btn btn-primary" style="width:100%">+ Registrar viaje</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resumen acarreado vs pagado -->
+  <div class="col" style="flex:1.3;min-width:380px">
+    <div class="card">
+      <div class="card-hd"><h3>Acarreado vs Pagado por material</h3></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Material</th><th>Viajes</th><th>M³ Acarreados</th><th>M³ Pagados</th><th>Diferencia</th></tr></thead>
+        <tbody>
+        {% for r in resumen %}
+        {% set pag = pagado.get(r.material, 0) %}
+        {% set dif = r.m3_acarreados|float - pag %}
+        <tr>
+          <td><b>{{ r.material }}</b></td>
+          <td>{{ r.viajes }}</td>
+          <td>{{ "{:,.1f}".format(r.m3_acarreados|float) }}</td>
+          <td>
+            <form method="POST" action="{{ url_for('acarreo_pagado') }}" style="display:flex;gap:4px;align-items:center">
+              <input type="hidden" name="obra_id" value="{{ obr }}">
+              <input type="hidden" name="semana" value="{{ sem }}">
+              <input type="hidden" name="material" value="{{ r.material }}">
+              <input class="form-control" type="number" step="0.01" name="m3_pagados"
+                     value="{{ pag }}" style="width:90px;padding:5px 8px;font-size:12px">
+              <button type="submit" class="btn btn-secondary btn-sm">Guardar</button>
+            </form>
+          </td>
+          <td style="color:var({{ '--ok' if dif<=0 else '--dg' }});font-weight:700">
+            {{ "{:,.1f}".format(dif) }}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align:center;color:var(--mt);padding:20px">
+          Sin viajes registrados {{ 'para este filtro' if obr or sem else 'todavía' }}.
+        </td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <div style="padding:10px 16px;font-size:11px;color:var(--mt)">
+        La diferencia compara lo acarreado (bitácora de viajes) contra lo pagado (según factura/ticket). Verde = pagado cubre lo acarreado.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Viajes recientes -->
+<div class="card">
+  <div class="card-hd"><h3>Viajes recientes</h3></div>
+  <div style="overflow-x:auto;max-height:420px;overflow-y:auto">
+  <table class="tbl">
+    <thead><tr><th>Fecha</th><th>Semana</th><th>Obra</th><th>Material</th><th>Placa</th>
+      <th>Origen</th><th>Destino</th><th>Volumen</th><th>Folio</th></tr></thead>
+    <tbody>
+    {% for v in viajes %}
+    <tr>
+      <td>{{ v.fecha }}</td>
+      <td>{{ v.semana }}</td>
+      <td>{{ v.obra_nombre or '—' }}</td>
+      <td>{{ v.material }}</td>
+      <td>{{ v.placa or '—' }}</td>
+      <td>{{ v.origen or '—' }}</td>
+      <td>{{ v.destino or '—' }}</td>
+      <td>{{ "{:,.2f}".format(v.volumen|float) }} m³</td>
+      <td>{{ v.folio_esma or '—' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9" style="text-align:center;color:var(--mt);padding:20px">Sin viajes registrados todavía.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

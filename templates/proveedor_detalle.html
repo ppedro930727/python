@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}{{ prov.razon_social }} — ESMA{% endblock %}
+{% block page_title %}{{ prov.razon_social }}{% endblock %}
+{% block breadcrumb %}Proveedores · Detalle{% endblock %}
+{% block topbar_actions %}
+{% if user_perms.get('proveedores',{}).get('editar') %}
+<a href="{{ url_for('proveedor_editar', pid=prov.id) }}" class="btn btn-secondary">Editar</a>
+{% endif %}
+{% if user_perms.get('proveedores',{}).get('eliminar') %}
+<form method="POST" action="{{ url_for('proveedor_cambiar_estado', pid=prov.id) }}" style="display:inline">
+  <input type="hidden" name="activo" value="{{ 0 if prov.activo else 1 }}">
+  <button type="submit" class="btn {{ 'btn-danger' if prov.activo else 'btn-primary' }}">
+    {{ 'Dar de baja' if prov.activo else 'Reactivar' }}
+  </button>
+</form>
+{% endif %}
+{% endblock %}
+{% block content %}
+
+<div class="row" style="margin-bottom:16px">
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ prov.rfc or '—' }}</div>
+    <div class="kpi-sm-lbl">RFC</div>
+  </div></div>
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ prov.tipo_proveedor or '—' }}</div>
+    <div class="kpi-sm-lbl">Tipo</div>
+  </div></div>
+  <div class="col"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ "%.1f"|format(calif.prom_100|float) if calif and calif.prom_100 else ("%.1f"|format(calif.prom|float * 20) if calif and calif.prom else '—') }}/100</div>
+    <div class="kpi-sm-lbl">Calificación promedio ({{ calif.n or 0 }} evaluaciones)</div>
+  </div></div>
+</div>
+
+<div class="row">
+  <div class="col" style="flex:1">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-hd"><h3>Datos de contacto</h3></div>
+      <div class="card-bd" style="font-size:13px;line-height:1.9">
+        <div><b>Dirección:</b> {{ prov.direccion or '—' }}, {{ prov.ciudad or '' }} {{ prov.estado or '' }} {{ prov.cp or '' }}</div>
+        <div><b>Teléfono:</b> {{ prov.telefono or '—' }} &nbsp; <b>Email:</b> {{ prov.email or '—' }}</div>
+        <div><b>Contacto:</b> {{ prov.contacto or '—' }}</div>
+        <div><b>Banco:</b> {{ prov.banco or '—' }} &nbsp; <b>CLABE:</b> {{ prov.cuenta_clabe or '—' }}</div>
+        <div><b>Condiciones de pago habituales:</b> {{ prov.condiciones_pago_habitual or '—' }}</div>
+        {% if prov.observaciones %}<div><b>Observaciones:</b> {{ prov.observaciones }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ EVALUACIONES ══════════ -->
+<div class="card" style="margin-bottom:16px">
+  <div class="card-hd"><h3>Evaluaciones de desempeño</h3>
+    {% if user_perms.get('proveedores',{}).get('crear') %}
+    <button class="btn btn-primary btn-sm" onclick="document.getElementById('modal-eval').style.display='flex'">+ Nueva evaluación</button>
+    {% endif %}
+  </div>
+  <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr>
+        <th>Fecha</th><th>Tipo</th><th>Obra</th><th>Evaluador</th>
+        <th style="text-align:right">Puntaje</th><th>Clasificación</th><th>Comentarios</th>
+      </tr></thead>
+      <tbody>
+      {% for e in evaluaciones %}
+      <tr>
+        <td style="font-size:12px">{{ e.fecha }}</td>
+        <td><span class="badge badge-ac">{{ e.tipo_evaluacion or 'servicio' }}</span></td>
+        <td style="font-size:12px">{{ e.obra_nombre or '—' }}</td>
+        <td style="font-size:12px">{{ e.evaluador or '—' }}</td>
+        <td style="text-align:right;font-weight:700;font-size:15px">
+          {{ "%.1f"|format(e.puntaje_final|float) if e.puntaje_final else "%.1f"|format(e.promedio|float * 20) }}/100
+        </td>
+        <td>
+          {% if e.clasificacion %}
+          {% set badge_cls = 'badge-ok' if 'CONFIABLE' == e.clasificacion else ('badge-wn' if 'DESARROLLO' in (e.clasificacion or '') else 'badge-dg') %}
+          <span class="badge {{ badge_cls }}">{{ e.clasificacion }}</span>
+          {% else %}
+          <span class="badge badge-mt">—</span>
+          {% endif %}
+        </td>
+        <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ e.comentarios or '' }}">{{ e.comentarios or '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align:center;padding:20px;color:var(--mt)">Sin evaluaciones registradas</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════ PUNTAJES ══════════ -->
+<div style="font-size:12px;color:var(--mt);margin-bottom:16px">
+  <b>Escala de calificación:</b> 0 - 10 por criterio &nbsp;|&nbsp;
+  <span style="color:var(--dg);font-weight:600">0-59 = NO CONFIABLE (Veto)</span> &nbsp;|&nbsp;
+  <span style="color:var(--wn);font-weight:600">60-79 = EN DESARROLLO</span> &nbsp;|&nbsp;
+  <span style="color:var(--ok);font-weight:600">80-100 = CONFIABLE</span>
+</div>
+
+<!-- ══════════ MODAL NUEVA EVALUACIÓN ══════════ -->
+{% if user_perms.get('proveedores',{}).get('crear') %}
+<div id="modal-eval" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px">
+  <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:28px;width:100%;max-width:780px;margin:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <h3 style="margin:0">Evaluación de Proveedor</h3>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('modal-eval').style.display='none'">Cerrar</button>
+    </div>
+    <form method="POST" action="{{ url_for('proveedor_evaluar', pid=prov.id) }}" id="formEval">
+      <!-- Datos generales -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+        <div style="flex:1;min-width:200px"><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Tipo de evaluación *</label>
+          <select class="form-control" name="tipo_evaluacion" id="sel_tipo_eval" onchange="cambiarTipoEval()" required>
+            <option value="servicio">A. Servicio</option>
+            <option value="materiales">B. Materiales</option>
+          </select></div>
+        <div style="flex:1;min-width:200px"><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Obra</label>
+          <select class="form-control" name="id_obra">
+            <option value="">— General —</option>
+            {% for o in obras %}<option value="{{ o.id }}">{{ o.nombre }}</option>{% endfor %}
+          </select></div>
+        <div style="flex:1;min-width:150px"><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Fecha evaluación</label>
+          <input class="form-control" type="date" name="fecha"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+        <div style="flex:1;min-width:150px"><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Evaluador</label>
+          <input class="form-control" name="evaluador"></div>
+        <div style="flex:1;min-width:120px"><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">No. Contrato / OC</label>
+          <input class="form-control" name="num_contrato"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+        <div style="flex:1;min-width:120px"><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Fecha inicio contrato</label>
+          <input class="form-control" type="date" name="fecha_inicio"></div>
+        <div style="flex:1;min-width:120px"><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Fecha fin contrato</label>
+          <input class="form-control" type="date" name="fecha_fin"></div>
+      </div>
+      <div style="margin-bottom:14px"><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Objeto del contrato y/o pedido</label>
+        <textarea class="form-control" name="objeto_contrato" rows="2" placeholder="Descripción del servicio/compra evaluado"></textarea></div>
+
+      <!-- SUB-CRITERIOS SERVICIO -->
+      <div id="criterios-servicio">
+        <h4 style="margin:16px 0 8px;border-bottom:1px solid var(--bd);padding-bottom:6px">A. SERVICIO</h4>
+        {% for rubro_key, rubro in criterios_servicio.items() %}
+        <div style="margin-bottom:12px">
+          <div style="font-weight:600;font-size:13px;margin-bottom:6px">{{ rubro.nombre }} <span style="color:var(--ac)">({{ (rubro.peso * 100)|int }}%)</span></div>
+          {% for codigo, desc in rubro.criterios %}
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;padding-left:12px">
+            <label style="flex:1;font-size:12px;color:var(--st)">{{ desc }}</label>
+            <input type="number" class="form-control crit-input" name="crit_{{ codigo }}" min="0" max="10" step="0.5" value="0"
+                   style="width:70px;text-align:center" oninput="recalcularTotal()">
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- SUB-CRITERIOS MATERIALES -->
+      <div id="criterios-materiales" style="display:none">
+        <h4 style="margin:16px 0 8px;border-bottom:1px solid var(--bd);padding-bottom:6px">B. MATERIALES</h4>
+        {% for rubro_key, rubro in criterios_materiales.items() %}
+        <div style="margin-bottom:12px">
+          <div style="font-weight:600;font-size:13px;margin-bottom:6px">{{ rubro.nombre }} <span style="color:var(--ac)">({{ (rubro.peso * 100)|int }}%)</span></div>
+          {% for codigo, desc in rubro.criterios %}
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;padding-left:12px">
+            <label style="flex:1;font-size:12px;color:var(--st)">{{ desc }}</label>
+            <input type="number" class="form-control crit-input" name="crit_{{ codigo }}" min="0" max="10" step="0.5" value="0"
+                   style="width:70px;text-align:center" oninput="recalcularTotal()">
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Puntaje calculado -->
+      <div style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:14px;margin:16px 0;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="font-size:13px;font-weight:600">EVALUACIÓN TOTAL:</span>
+          <span id="puntaje-display" style="font-size:22px;font-weight:700;margin-left:12px;color:var(--ac)">0.00</span>
+          <span style="font-size:13px;color:var(--mt)"> / 100</span>
+        </div>
+        <span id="clasificacion-display" class="badge badge-mt">—</span>
+      </div>
+
+      <div style="margin-bottom:14px"><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Análisis de evaluación / Comentarios</label>
+        <textarea class="form-control" name="comentarios" rows="2" placeholder="Si la calificación es baja, indicar acción preventiva/correctiva requerida"></textarea></div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" onclick="document.getElementById('modal-eval').style.display='none'" class="btn btn-secondary">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar evaluación</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+var pesos_servicio = {{ criterios_servicio_json|safe }};
+var pesos_materiales = {{ criterios_materiales_json|safe }};
+
+function cambiarTipoEval(){
+  var tipo = document.getElementById('sel_tipo_eval').value;
+  document.getElementById('criterios-servicio').style.display = (tipo==='servicio') ? 'block' : 'none';
+  document.getElementById('criterios-materiales').style.display = (tipo==='materiales') ? 'block' : 'none';
+  recalcularTotal();
+}
+
+function recalcularTotal(){
+  var tipo = document.getElementById('sel_tipo_eval').value;
+  var config = (tipo==='servicio') ? pesos_servicio : pesos_materiales;
+  var total = 0;
+  for (var rubro in config) {
+    var criterios = config[rubro].criterios;
+    var peso = config[rubro].peso;
+    var suma = 0;
+    var count = criterios.length;
+    for (var i=0; i<count; i++){
+      var input = document.querySelector('[name="crit_'+criterios[i][0]+'"]');
+      if (input) suma += parseFloat(input.value) || 0;
+    }
+    var promedio = count > 0 ? suma / count : 0;
+    total += (promedio * 10) * peso; // normalizar a 0-100
+  }
+  total = Math.round(total * 100) / 100;
+  document.getElementById('puntaje-display').textContent = total.toFixed(2);
+  // Clasificación
+  var badge = document.getElementById('clasificacion-display');
+  if (total >= 80) { badge.textContent = 'CONFIABLE'; badge.className = 'badge badge-ok'; }
+  else if (total >= 60) { badge.textContent = 'EN DESARROLLO'; badge.className = 'badge badge-wn'; }
+  else { badge.textContent = 'NO CONFIABLE (Veto)'; badge.className = 'badge badge-dg'; }
+}
+</script>
+{% endif %}
+{% endblock %}

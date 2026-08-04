@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ accion }} Usuario — ESMA{% endblock %}
+{% block page_title %}{{ accion }} Usuario{% endblock %}
+{% block content %}
+<div class="card" style="max-width:480px">
+  <div class="card-hd"><h3>Datos del usuario</h3></div>
+  <div class="card-bd">
+    <form method="POST">
+      <div class="form-group"><label>Nombre completo</label>
+        <input class="form-control" name="nombre" value="{{ u.nombre if u else '' }}" required></div>
+      <div class="form-group"><label>Correo electrónico</label>
+        <input class="form-control" type="email" name="email" value="{{ u.email if u else '' }}" required></div>
+      <div class="form-group"><label>{{ 'Nueva contraseña (dejar vacío para no cambiar)' if u else 'Contraseña' }}</label>
+        <input class="form-control" type="password" name="password" {{ 'required' if not u }}></div>
+      {% if es_admin is not defined or es_admin %}
+      <div class="form-group"><label>Rol</label>
+        <select class="form-control" name="rol" id="sel-rol" onchange="toggleObraAsignada()">
+          {% for r in todos_roles %}
+          <option value="{{ r }}" {{ 'selected' if u and u.rol==r }}>{{ r|rol_label }}</option>
+          {% endfor %}
+        </select></div>
+      <div class="form-group" id="grupo-obra-asignada">
+        <label>Obra asignada</label>
+        <select class="form-control" name="id_obra_asignada">
+          <option value="">— Sin obra asignada —</option>
+          {% for ob in obras %}
+          <option value="{{ ob.id }}" {{ 'selected' if u and u.id_obra_asignada==ob.id }}>{{ ob.nombre }}</option>
+          {% endfor %}
+        </select>
+        <small style="opacity:.6;display:block;margin-top:4px">
+          Aplica solo para Superintendente de Obra y Administrador de Obra: solo podrán
+          administrar (editar, archivar, asignar/liberar equipos) la obra que se les asigne aquí.
+        </small>
+      </div>
+      {% if u %}
+      <div class="form-group"><label>Estado</label>
+        <select class="form-control" name="activo">
+          <option value="1" {{ 'selected' if u.activo }}>Activo</option>
+          <option value="0" {{ 'selected' if not u.activo }}>Inactivo</option>
+        </select></div>
+      {% endif %}
+      {% endif %}
+      <div style="display:flex;gap:10px">
+        <button type="submit" class="btn btn-primary">{{ accion }} usuario</button>
+        <a href="{{ url_for('usuarios') }}" class="btn btn-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+const ROLES_RESTRINGIDOS = {{ roles_restringidos|list|tojson }};
+function toggleObraAsignada() {
+  const rol = document.getElementById('sel-rol').value;
+  document.getElementById('grupo-obra-asignada').style.display =
+    ROLES_RESTRINGIDOS.includes(rol) ? 'block' : 'none';
+}
+window.addEventListener('DOMContentLoaded', toggleObraAsignada);
+</script>
+{% endblock %}

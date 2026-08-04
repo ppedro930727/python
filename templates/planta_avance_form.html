@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Nuevo tramo — ESMA{% endblock %}
+{% block page_title %}Planta de Asfalto · Nuevo tramo de Avance Físico{% endblock %}
+{% block breadcrumb %}Área, volumen compactado y acumulado se calculan solos{% endblock %}
+{% block content %}
+<div class="card"><div class="card-bd">
+  <form method="POST">
+    <input type="hidden" name="id_obra" value="{{ obr }}">
+    <div class="row">
+      <div class="col form-group" style="min-width:150px"><label>Fecha</label>
+        <input class="form-control" type="date" name="fecha" value="{{ hoy }}" required></div>
+      <div class="col form-group" style="min-width:120px"><label>Carril</label>
+        <input class="form-control" name="carril" placeholder="ALTA / BAJA"></div>
+      <div class="col form-group" style="min-width:130px"><label>Inicio (cadenamiento)</label>
+        <input class="form-control" type="number" step="0.01" name="inicio" required></div>
+      <div class="col form-group" style="min-width:130px"><label>Término (cadenamiento)</label>
+        <input class="form-control" type="number" step="0.01" name="termino" required></div>
+      <div class="col form-group" style="min-width:110px"><label>Ancho (m)</label>
+        <input class="form-control" type="number" step="0.01" name="ancho" required></div>
+      <div class="col form-group" style="min-width:110px"><label>Espesor (m)</label>
+        <input class="form-control" type="number" step="0.001" name="espesor" required></div>
+    </div>
+    <button class="btn btn-primary" type="submit">Guardar tramo</button>
+    <a href="{{ url_for('planta_avance', obra=obr) }}" class="btn btn-secondary">Cancelar</a>
+  </form>
+</div></div>
+{% endblock %}

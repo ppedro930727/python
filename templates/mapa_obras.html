@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% block title %}Mapa de Obras — ESMA{% endblock %}
+{% block page_title %}Mapa de Obras{% endblock %}
+{% block breadcrumb %}Herramientas · Mapa KML{% endblock %}
+{% block topbar_actions %}
+<label class="btn btn-secondary" style="cursor:pointer">
+  Subir KML <input type="file" id="kml-upload" accept=".kml,.kmz" style="display:none" onchange="cargarKML(this)">
+</label>
+<button class="btn btn-primary" onclick="exportarKML()">Descargar KML</button>
+<button class="btn btn-secondary" onclick="suavizarLineas()">Suavizar lineas</button>
+<button class="btn btn-secondary" onclick="deshacerUltimo()">Deshacer</button>
+<button class="btn btn-secondary" onclick="limpiarMapa()">Limpiar mapa</button>
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<style>
+#mapa{width:100%;height:calc(100vh - 160px);border-radius:12px;border:1px solid var(--bd);}
+.info-panel{position:absolute;top:12px;right:12px;z-index:1000;background:var(--s1);border:1px solid var(--bd);
+  border-radius:10px;padding:12px 16px;font-size:12px;color:var(--mt);box-shadow:0 4px 12px rgba(0,0,0,.2);max-width:220px;}
+.info-panel h4{font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;color:var(--ac);}
+.capas-lista{max-height:200px;overflow-y:auto;margin-top:8px;}
+.capa-item{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:11px;border-bottom:1px solid var(--bd);}
+.capa-item:last-child{border:none;}
+.capa-color{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="position:relative">
+  <!-- Barra de búsqueda -->
+  <div style="margin-bottom:12px;display:flex;gap:8px">
+    <input class="form-control" type="text" id="search-input" placeholder="Buscar: municipio, coordenadas, codigo postal, direccion..."
+           style="flex:1;font-size:14px" onkeydown="if(event.key==='Enter'){buscarUbicacion()}">
+    <button class="btn btn-primary" onclick="buscarUbicacion()">Buscar</button>
+  </div>
+  <div id="search-results" style="display:none;position:absolute;top:48px;left:0;right:0;z-index:2000;background:var(--s1);border:1px solid var(--bd);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.3)"></div>
+  <div id="mapa"></div>
+  <div class="info-panel">
+    <h4>Capas KML</h4>
+    <div id="capas-lista" class="capas-lista">
+      <p style="color:var(--mt);font-size:11px">Sin capas cargadas</p>
+    </div>
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bd)">
+      <h4>Elementos dibujados</h4>
+      <div id="draw-count" style="font-size:11px;color:var(--mt)">0 elementos</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
+<script>
+// ── Inicializar mapa ────────────────────────────────────────────
+var map = L.map('mapa').setView([19.4326, -99.1332], 6);
+
+var capaCalles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19, attribution: '© OpenStreetMap'
+}).addTo(map);
+
+var capaSatelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 19, attribution: '© Esri'
+});
+
+L.control.layers({'Calles': capaCalles, 'Satelite': capaSatelite}, {}, {position:'topleft'}).addTo(map);
+
+// ── Capa de dibujo ──────────────────────────────────────────────
+var drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+
+var drawControl = new L.Control.Draw({
+  position: 'topleft',
+  draw: {
+    polyline: {shapeOptions:{color:'#2E3192',weight:4}},
+    polygon: {shapeOptions:{color:'#3B3F9E',fillOpacity:0.3}},
+    rectangle: {shapeOptions:{color:'#3B3F9E',fillOpacity:0.3}},
+    circle: false,
+    circlemarker: false,
+    marker: true
+  },
+  edit: {featureGroup: drawnItems}
+});
+map.addControl(drawControl);
+
+map.on(L.Draw.Event.CREATED, function(e){
+  var layer = e.layer;
+  // Pedir nombre al elemento
+  var nombre = prompt('Nombre del elemento (opcional):','') || '';
+  if(nombre) layer.bindPopup('<strong>'+nombre+'</strong>');
+  layer.feature = layer.feature || {type:'Feature',properties:{}};
+  layer.feature.properties.name = nombre;
+  drawnItems.addLayer(layer);
+  actualizarConteo();
+});
+map.on(L.Draw.Event.DELETED, function(){actualizarConteo()});
+
+function actualizarConteo(){
+  var n = drawnItems.getLayers().length;
+  document.getElementById('draw-count').textContent = n + ' elemento' + (n!==1?'s':'');
+}
+
+// ── Deshacer (Ctrl+Z) ───────────────────────────────────────────
+var historial=[];
+map.on(L.Draw.Event.CREATED, function(e){
+  historial.push(e.layer);
+});
+
+document.addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){
+    e.preventDefault();
+    deshacerUltimo();
+  }
+});
+
+function deshacerUltimo(){
+  if(historial.length===0) return;
+  var ultimo=historial.pop();
+  drawnItems.removeLayer(ultimo);
+  actualizarConteo();
+}
+
+// ── Suavizar líneas (Bézier/Catmull-Rom) ────────────────────────
+function suavizarLineas(){
+  drawnItems.eachLayer(function(layer){
+    if(layer instanceof L.Polyline && !(layer instanceof L.Polygon)){
+      var latlngs=layer.getLatLngs();
+      if(latlngs.length<3) return;
+      var suave=interpolarCatmullRom(latlngs, 10);
+      layer.setLatLngs(suave);
+    }
+  });
+}
+
+function interpolarCatmullRom(puntos, segmentos){
+  var result=[];
+  for(var i=0;i<puntos.length-1;i++){
+    var p0=puntos[Math.max(i-1,0)];
+    var p1=puntos[i];
+    var p2=puntos[i+1];
+    var p3=puntos[Math.min(i+2,puntos.length-1)];
+    for(var t=0;t<segmentos;t++){
+      var tt=t/segmentos;
+      var lat=catmull(p0.lat,p1.lat,p2.lat,p3.lat,tt);
+      var lng=catmull(p0.lng,p1.lng,p2.lng,p3.lng,tt);
+      result.push(L.latLng(lat,lng));
+    }
+  }
+  result.push(puntos[puntos.length-1]);
+  return result;
+}
+
+function catmull(p0,p1,p2,p3,t){
+  var t2=t*t, t3=t2*t;
+  return 0.5*(
+    (2*p1)+
+    (-p0+p2)*t+
+    (2*p0-5*p1+4*p2-p3)*t2+
+    (-p0+3*p1-3*p2+p3)*t3
+  );
+}
+
+// ── Cargar KML ──────────────────────────────────────────────────
+var kmlLayers = [];
+var colores = ['#2E3192','#e63946','#f4a261','#2a9d8f','#6366f1','#ec4899'];
+var colorIdx = 0;
+
+function cargarKML(input){
+  var file = input.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      var parser = new DOMParser();
+      var xml = parser.parseFromString(e.target.result, 'text/xml');
+      var geojson = toGeoJSON.kml(xml);
+      var color = colores[colorIdx % colores.length];
+      colorIdx++;
+      var layer = L.geoJSON(geojson, {
+        style: function(){return {color:color, weight:3, fillOpacity:0.2}},
+        pointToLayer: function(f,ll){
+          return L.circleMarker(ll,{radius:7,color:color,fillColor:color,fillOpacity:0.8});
+        },
+        onEachFeature: function(f,l){
+          var name = (f.properties && f.properties.name) || '';
+          var desc = (f.properties && f.properties.description) || '';
+          if(name||desc) l.bindPopup('<strong>'+name+'</strong>'+(desc?'<br>'+desc:''));
+        }
+      }).addTo(map);
+      map.fitBounds(layer.getBounds(),{padding:[30,30]});
+      kmlLayers.push({name:file.name, layer:layer, color:color});
+      actualizarCapas();
+    } catch(err){
+      alert('Error al leer el archivo KML: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+
+function actualizarCapas(){
+  var html='';
+  kmlLayers.forEach(function(c,i){
+    html+='<div class="capa-item"><span class="capa-color" style="background:'+c.color+'"></span><span style="flex:1">'+c.name+'</span><button onclick="quitarCapa('+i+')" style="background:none;border:none;color:var(--mt);cursor:pointer;font-size:14px" title="Quitar">×</button></div>';
+  });
+  if(!html) html='<p style="color:var(--mt);font-size:11px">Sin capas cargadas</p>';
+  document.getElementById('capas-lista').innerHTML=html;
+}
+
+function quitarCapa(idx){
+  map.removeLayer(kmlLayers[idx].layer);
+  kmlLayers.splice(idx,1);
+  actualizarCapas();
+}
+
+function limpiarMapa(){
+  if(!confirm('Limpiar todos los elementos y capas?')) return;
+  drawnItems.clearLayers();
+  kmlLayers.forEach(function(c){map.removeLayer(c.layer)});
+  kmlLayers=[];
+  actualizarCapas();
+  actualizarConteo();
+}
+
+// ── Exportar KML ────────────────────────────────────────────────
+function exportarKML(){
+  var features=[];
+  // Elementos dibujados
+  drawnItems.eachLayer(function(layer){
+    if(layer.toGeoJSON) features.push(layer.toGeoJSON());
+  });
+  // Capas KML cargadas
+  kmlLayers.forEach(function(c){
+    c.layer.eachLayer(function(l){
+      if(l.toGeoJSON) features.push(l.toGeoJSON());
+    });
+  });
+  if(features.length===0){alert('No hay elementos para exportar');return;}
+
+  var geojson={type:'FeatureCollection',features:features};
+  // Enviar al servidor para convertir a KML
+  fetch('/mapa-obras/exportar-kml',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(geojson)
+  }).then(function(r){return r.blob()})
+  .then(function(blob){
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;
+    a.download='mapa_obras_'+new Date().toISOString().slice(0,10)+'.kml';
+    a.click();
+    URL.revokeObjectURL(url);
+  }).catch(function(err){alert('Error al exportar: '+err)});
+}
+
+// ── Buscar ubicación (geocoding) ────────────────────────────────
+var searchMarker=null;
+function buscarUbicacion(){
+  var q=document.getElementById('search-input').value.trim();
+  if(!q) return;
+
+  // Detectar si son coordenadas directas (lat,lng o lat lng)
+  var coordMatch=q.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
+  if(coordMatch){
+    var lat=parseFloat(coordMatch[1]), lng=parseFloat(coordMatch[2]);
+    irAUbicacion(lat, lng, q);
+    return;
+  }
+
+  // Buscar con Nominatim (OpenStreetMap)
+  var url='https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=mx&q='+encodeURIComponent(q);
+  fetch(url).then(function(r){return r.json()}).then(function(results){
+    if(results.length===0){
+      alert('No se encontraron resultados para: '+q);
+      return;
+    }
+    if(results.length===1){
+      irAUbicacion(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].display_name);
+    } else {
+      mostrarResultados(results);
+    }
+  }).catch(function(err){alert('Error en la busqueda: '+err)});
+}
+
+function mostrarResultados(results){
+  var div=document.getElementById('search-results');
+  var html='';
+  results.forEach(function(r,i){
+    html+='<div style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bd);font-size:12px" onmouseover="this.style.background=\'var(--s2)\'" onmouseout="this.style.background=\'\'" onclick="seleccionarResultado('+r.lat+','+r.lon+',\''+r.display_name.replace(/'/g,"\\'")+'\')">'+r.display_name+'</div>';
+  });
+  div.innerHTML=html;
+  div.style.display='block';
+}
+
+function seleccionarResultado(lat,lng,nombre){
+  document.getElementById('search-results').style.display='none';
+  irAUbicacion(lat,lng,nombre);
+}
+
+function irAUbicacion(lat,lng,nombre){
+  if(searchMarker) map.removeLayer(searchMarker);
+  map.setView([lat,lng],15);
+  searchMarker=L.marker([lat,lng]).addTo(map).bindPopup('<strong>'+nombre+'</strong>').openPopup();
+  document.getElementById('search-results').style.display='none';
+}
+
+// Cerrar resultados al hacer clic fuera
+document.addEventListener('click',function(e){
+  if(!e.target.closest('#search-results')&&!e.target.closest('#search-input')){
+    document.getElementById('search-results').style.display='none';
+  }
+});
+</script>
+{% endblock %}

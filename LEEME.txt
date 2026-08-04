@@ -1,0 +1,144 @@
+MÓDULOS NUEVOS — CONTROL FINANCIERO ESMA
+============================================================
+Incluye: Proveedores · Presupuesto/Códigos de Costo · Análisis de Compra ·
+Caja Chica/Reembolsos/Viáticos · Solicitudes de Cancelación CFDI · enlace
+automático de OC/Requisiciones aprobadas con el presupuesto por obra.
+
+QUÉ TRAE CADA MÓDULO
+---------------------
+1. PROVEEDORES
+   Catálogo maestro (razón social, RFC, tipo, contacto, datos bancarios) +
+   evaluaciones de desempeño (calidad/entrega/precio/servicio, 1-5). El
+   campo "Proveedor" de Órdenes de Compra ahora autocompleta RFC, contacto,
+   teléfono, email y condiciones de pago al elegir uno del catálogo.
+
+2. PRESUPUESTO Y CÓDIGOS DE COSTO
+   Catálogo jerárquico de códigos de costo (ej. "1-02-020") + presupuesto
+   por obra (original/revisado/comprometido/ejercido) + bitácora de costos
+   directos. Importa directo tus formatos:
+     - "Códigos de costo_Import_template GENERAL.xlsx"  → catálogo
+     - budget_details.csv (export de Procore)            → presupuesto
+     - direct_costs.csv (export de Procore)               → costos directos
+   Vista con barra de avance por código y KPIs de presupuestado/
+   comprometido/ejercido por obra.
+
+3. ENLACE AUTOMÁTICO PRESUPUESTO ↔ OC / REQUISICIONES
+   Tanto la Orden de Compra como la Requisición ahora tienen un selector
+   opcional "Código de costo". Al AUTORIZAR una OC, su total se suma solo
+   a "comprometido" (oc_aprobadas) del código de costo en esa obra; si se
+   CANCELA o RECHAZA una OC ya autorizada, se resta automáticamente. Al
+   APROBAR una Requisición con código de costo asignado, su total
+   autorizado se suma a "ejercido" (costos_reales). No depende de volver
+   a importar budget_details.csv para reflejar movimiento nuevo.
+
+4. ANÁLISIS DE COMPRA (comparación de cotizaciones)
+   Crea un análisis (qué se está cotizando + obra + requisitante), agrega
+   2 o más cotizaciones de distintos proveedores con sus partidas
+   (descripción/cantidad/P.U.), compáralas lado a lado, marca la ganadora
+   y genera la Orden de Compra correspondiente con un clic (copia
+   proveedor + partidas de la cotización ganadora a un borrador de OC).
+
+5. CAJA CHICA / REEMBOLSOS / VIÁTICOS
+   Registro de movimientos por obra y empresa (ESMA/GREMIAL), con tipo
+   (Reembolso de gastos / Viáticos / Caja chica), monto + IVA, marca de
+   "comprobado", y flujo de aprobación borrador → enviado → aprobado/
+   rechazado, igual que Requisiciones/OC.
+
+6. SOLICITUDES DE CANCELACIÓN DE CFDI
+   Registro simple: folio fiscal, razón social, RFC, clave de cancelación
+   SAT, monto, justificación, CFDI que reemplaza. Estatus pendiente →
+   aplicada/rechazada.
+
+ARCHIVOS MODIFICADOS/NUEVOS
+----------------------------
+- database.py   → todas las tablas y funciones CRUD de los 6 puntos
+                   anteriores, MODULOS_PERMISOS y _defaults_permisos()
+                   actualizados con 5 módulos nuevos (proveedores,
+                   presupuesto, analisis_compra, caja_chica,
+                   cancelaciones_cfdi), y las funciones de aprobar/
+                   autorizar/rechazar/cancelar de OC y Requisiciones ahora
+                   actualizan presupuesto_obra automáticamente.
+- app.py         → rutas nuevas para los 6 módulos + inicialización de
+                   tablas y migración de columnas al arrancar.
+- templates/base.html → 5 links nuevos en el sidebar bajo "Control
+  Financiero": Requisiciones, Órdenes de Compra, Análisis de Compra,
+  Caja Chica, Cancelaciones CFDI, Proveedores, Presupuesto.
+- templates/orden_compra_form.html → autofill de proveedor + selector de
+  código de costo.
+- templates/requisicion_form.html → selector de código de costo.
+- templates/proveedores.html, proveedor_form.html, proveedor_detalle.html
+- templates/presupuesto.html, presupuesto_importar.html
+- templates/codigos_costo.html, codigos_costo_importar.html
+- templates/analisis_compra.html, analisis_compra_form.html,
+  analisis_compra_detalle.html
+- templates/caja_chica.html, caja_chica_form.html, caja_chica_detalle.html
+- templates/cancelaciones.html, cancelacion_form.html
+
+VERIFICACIONES HECHAS
+-----------------------
+- database.py y app.py compilan sin errores (python3 -m py_compile).
+- Los 18 templates (nuevos + modificados) pasan el parser de Jinja2 sin
+  errores de sintaxis.
+- Se verificaron los 122 url_for() usados en todos los templates contra
+  las funciones de ruta definidas en app.py: 0 endpoints faltantes.
+
+CÓMO DESPLEGAR
+---------------
+1. Sube estos archivos al servidor reemplazando los actuales
+   (respeta la misma ruta relativa):
+   database.py
+   app.py
+   templates/base.html
+   templates/orden_compra_form.html
+   templates/requisicion_form.html
+   templates/proveedores.html (nuevo)
+   templates/proveedor_form.html (nuevo)
+   templates/proveedor_detalle.html (nuevo)
+   templates/presupuesto.html (nuevo)
+   templates/presupuesto_importar.html (nuevo)
+   templates/codigos_costo.html (nuevo)
+   templates/codigos_costo_importar.html (nuevo)
+   templates/analisis_compra.html (nuevo)
+   templates/analisis_compra_form.html (nuevo)
+   templates/analisis_compra_detalle.html (nuevo)
+   templates/caja_chica.html (nuevo)
+   templates/caja_chica_form.html (nuevo)
+   templates/caja_chica_detalle.html (nuevo)
+   templates/cancelaciones.html (nuevo)
+   templates/cancelacion_form.html (nuevo)
+
+2. Reinicia el servicio: sudo systemctl restart esma.service
+   Todas las tablas nuevas y columnas (id_codigo_costo en ordenes_compra
+   y requisiciones) se crean/migran solas al arrancar — mismo patrón que
+   ya usa el resto de la plataforma (CREATE TABLE IF NOT EXISTS / ALTER
+   TABLE ADD COLUMN envuelto en try/except). No requiere SQL manual.
+
+3. Como admin ya verás los 5 módulos nuevos en el sidebar de inmediato
+   (admin tiene acceso total por defecto). Para los demás roles, ajusta
+   en /permisos si algo no cuadra con lo que necesitas — quedaron
+   defaults razonables (Control Interno/Auditoría con lectura amplia,
+   Superintendente con alta en Análisis de Compra/Caja Chica/Proveedores).
+
+ORDEN SUGERIDO DE USO
+-----------------------
+1. Da de alta tus proveedores en /proveedores/nuevo.
+2. Importa el catálogo de códigos de costo una sola vez en
+   /presupuesto/codigos/importar.
+3. Por cada obra activa, importa su budget_details.csv en
+   /presupuesto/importar (puedes reimportar cuando quieras, hace upsert).
+4. De ahí en adelante, al levantar una OC o Requisición, asigna el
+   código de costo correspondiente — el presupuesto se actualizará solo
+   conforme autorices/apruebes.
+5. Para compras que requieren comparar proveedores, usa primero
+   /analisis-compra en vez de crear la OC directamente.
+
+PENDIENTE / LIMITACIONES CONOCIDAS
+-------------------------------------
+- Si editas una OC ya autorizada y cambias sus partidas/total, el
+  "comprometido" en presupuesto_obra no se re-ajusta solo (evita editar
+  el total de una OC ya autorizada; cancela y crea una nueva si hace
+  falta un cambio importante).
+- El código de costo en OC/Requisición es a nivel cabecera (todo el
+  documento), no por partida individual — suficiente para la mayoría de
+  los casos reales que compartiste, pero si necesitas partir una sola OC
+  entre 2+ códigos de costo, tocaría extenderlo a nivel partida.

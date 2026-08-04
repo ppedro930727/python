@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+{% block title %}Reportes 360 — ESMA{% endblock %}
+{% block page_title %}Reportes 360 · Auditoría de Combustible{% endblock %}
+{% block breadcrumb %}Herramientas esenciales · Cargado vs Telemetría{% endblock %}
+{% block topbar_actions %}
+{% if puede_crear %}
+<a href="{{ url_for('combustible_nuevo') }}" class="btn btn-primary">+ Nuevo reporte</a>
+<button class="btn btn-dark" onclick="document.getElementById('overlayImportarComb').style.display='flex'">📥 Importar Excel</button>
+{% endif %}
+{% endblock %}
+{% block content %}
+
+<div class="r360-tabs">
+  <a href="{{ url_for('combustible') }}" class="r360-tab active">⛽ Combustible</a>
+</div>
+
+{% set tc = kpis.total_cargados|float %}
+{% set tt = kpis.total_telemetria|float %}
+{% set tf = kpis.total_faltantes|float %}
+<!-- KPIs -->
+<div class="row" style="margin-bottom:6px">
+  <div class="col" style="min-width:150px"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ kpis.total_reportes or 0 }}</div>
+    <div class="kpi-sm-lbl">Reportes</div>
+  </div></div>
+  <div class="col" style="min-width:150px"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ "{:,.0f}".format(tc) }} <span style="font-size:13px;color:#e3e4f7">L</span></div>
+    <div class="kpi-sm-lbl">Litros cargados</div>
+  </div></div>
+  {% if ver_telemetria %}
+  <div class="col" style="min-width:150px"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ "{:,.0f}".format(tt) }} <span style="font-size:13px;color:#e3e4f7">L</span></div>
+    <div class="kpi-sm-lbl">Litros telemetría</div>
+  </div></div>
+  <div class="col" style="min-width:150px"><div class="kpi-card">
+    <div class="kpi-sm-val">{{ "{:,.0f}".format(tf) }} <span style="font-size:13px;color:#e3e4f7">L</span></div>
+    <div class="kpi-sm-lbl">Litros faltantes</div>
+  </div></div>
+  {% endif %}
+</div>
+
+{% if ver_telemetria %}
+<!-- Semáforo resumen -->
+<div class="row" style="margin-bottom:16px">
+  {% set sems = [('OK', kpis.n_ok, '--ok'), ('Revisar', kpis.n_revisar, '--wn'), ('Alerta', kpis.n_alerta, '--al'), ('Fraude Probable', kpis.n_fraude, '--dg')] %}
+  {% for label, val, color in sems %}
+  <div class="col" style="min-width:140px"><div class="kpi-card" style="display:flex;align-items:center;gap:10px;padding:12px 16px">
+    <span class="sem-dot" style="background:#fff;width:14px;height:14px"></span>
+    <div><div style="font-size:22px;font-weight:800;color:#fff">{{ val or 0 }}</div>
+    <div style="font-size:10px;color:#e3e4f7;text-transform:uppercase">{{ label }}</div></div>
+  </div></div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="row">
+  <!-- Tendencia (visible para todos, pero datasets según permiso) -->
+  <div class="col" style="flex:2;min-width:340px">
+    <div class="card"><div class="card-hd"><h3>Tendencia — Cargado{% if ver_telemetria %} vs Telemetría vs Faltante{% endif %}</h3></div>
+      <div class="card-bd"><canvas id="grafTend" height="120"></canvas></div></div>
+  </div>
+  <!-- Por obra (solo si tiene permiso de telemetría) -->
+  {% if ver_telemetria %}
+  <div class="col" style="flex:1;min-width:280px">
+    <div class="card"><div class="card-hd"><h3>Faltantes por obra</h3></div>
+      <div style="overflow-x:auto;max-height:265px;overflow-y:auto">
+      <table class="tbl"><thead><tr><th>Obra</th><th>Rep.</th><th>Faltan</th><th>Crít.</th></tr></thead><tbody>
+      {% for o in por_obra %}
+      <tr>
+        <td style="font-size:11px">{{ o.obra or '—' }}</td>
+        <td>{{ o.reportes }}</td>
+        <td style="font-weight:700;color:var({{ '--dg' if (o.faltantes|float)>0 else '--ok' }})">{{ "%.0f"|format(o.faltantes|float) }}</td>
+        <td>{% if o.criticos %}<span class="badge badge-dg">{{ o.criticos }}</span>{% else %}—{% endif %}</td>
+      </tr>
+      {% else %}<tr><td colspan="4" style="text-align:center;padding:18px;color:var(--mt)">Sin datos</td></tr>{% endfor %}
+      </tbody></table></div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Filtros -->
+<div class="card">
+  <div class="card-bd">
+    <form method="GET" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Desde</label>
+        <input class="form-control" type="date" name="fecha_ini" value="{{ fi }}"></div>
+      <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Hasta</label>
+        <input class="form-control" type="date" name="fecha_fin" value="{{ ff }}"></div>
+      <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Semáforo</label>
+        <select class="form-control" name="semaforo">
+          <option value="">Todos</option>
+          {% for s in ['OK','Revisar','Alerta','Fraude Probable'] %}
+          <option value="{{ s }}" {{ 'selected' if sem==s }}>{{ s }}</option>{% endfor %}
+        </select></div>
+      <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Obra</label>
+        <select class="form-control" name="obra">
+          <option value="">Todas</option>
+          {% for o in obras %}<option value="{{ o.id }}" {{ 'selected' if obr==o.id|string }}>{{ o.nombre }}</option>{% endfor %}
+        </select></div>
+      <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">ECO</label>
+        <input class="form-control" name="eco" value="{{ eco }}" placeholder="EXC-001" style="width:120px"></div>
+      <button type="submit" class="btn btn-primary">Filtrar</button>
+      <a href="{{ url_for('combustible') }}" class="btn btn-secondary">Limpiar</a>
+      <a href="{{ url_for('exportar_excel', tabla='combustible', fecha_ini=fi, fecha_fin=ff) }}" class="btn btn-secondary">↓ Excel</a>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ DIESEL ═══ -->
+<div class="card">
+  <div class="card-hd" style="background:linear-gradient(90deg,#1c2230,#2E3192);border-radius:12px 12px 0 0">
+    <h3 style="color:#fff;font-size:14px;font-weight:700">DIESEL</h3>
+    <span style="color:#e3e4f7;font-size:12px">{{ reportes_diesel|length }} reportes</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr>
+        <th>Fecha</th><th>SEM</th><th>ECO</th><th>Equipo</th><th>Obra</th><th>Operador</th>
+        <th style="text-align:right">Cargado</th>
+        {% if ver_telemetria %}
+        <th style="text-align:right">Telemetría</th>
+        <th style="text-align:right">Faltante</th><th style="text-align:right">Desv.</th>
+        <th>Semáforo</th>
+        {% endif %}
+        <th>Justif.</th>
+        {% if ROLES_ORDEN.get(user.rol,0) >= ROLES_ORDEN.get('supervisor',0) %}<th></th>{% endif %}
+      </tr></thead>
+      <tbody>
+      {% for r in reportes_diesel %}
+      {% set scol = {'OK':'--ok','Revisar':'--wn','Alerta':'--al','Fraude Probable':'--dg'}.get(r.semaforo, '--mt') %}
+      {% set sbadge = {'OK':'badge-ok','Revisar':'badge-wn','Alerta':'badge-al','Fraude Probable':'badge-dg'}.get(r.semaforo, 'badge-mt') %}
+      <tr>
+        <td style="font-size:11px;color:var(--mt)">{{ r.fecha }}</td>
+        <td style="font-size:11px;font-weight:700;text-align:center">{{ r.semana_num or '—' }}</td>
+        <td><span class="eco">{{ r.codigo_eco }}</span></td>
+        <td style="font-size:11px">{{ r.nombre_equipo or '—' }}</td>
+        <td style="font-size:11px;color:var(--mt)">{{ r.obra_nombre or '—' }}</td>
+        <td style="font-size:11px">{{ r.operador or '—' }}</td>
+        <td style="text-align:right">{{ "%.1f"|format(r.litros_cargados|float) }}</td>
+        {% if ver_telemetria %}
+        <td style="text-align:right;color:var(--mt)">{{ "%.1f"|format(r.litros_telemetria|float) }}</td>
+        <td style="text-align:right;font-weight:700;color:var({{ scol }})">{{ "%.1f"|format(r.litros_faltantes|float) }}</td>
+        <td style="text-align:right;color:var({{ scol }})">{{ "%.1f"|format(r.desviacion_pct|float) }}%</td>
+        <td><span class="badge {{ sbadge }}">{{ r.semaforo }}</span></td>
+        {% endif %}
+        <td>{% if r.justificado %}<span class="badge badge-ok">Sí</span>{% else %}<span class="badge badge-mt">No</span>{% endif %}</td>
+        {% if ROLES_ORDEN.get(user.rol,0) >= ROLES_ORDEN.get('supervisor',0) %}
+        <td><button class="btn btn-secondary btn-sm" onclick="abrirJust({{ r.id }}, {{ r.justificado }}, '{{ (r.observaciones or '')|replace("'","\\'")|replace('\n',' ') }}')">Revisar</button></td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr><td colspan="{{ 13 if ver_telemetria else 9 }}" style="text-align:center;padding:20px;color:var(--mt)">Sin reportes de diesel</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ GASOLINA ═══    <div class="kpi-card">   <div class="kpi-card">    -->
+ 
+<div class="card">
+  <div class="card-hd" style="background:linear-gradient(90deg,#3B3F9E,#2E3192);border-radius:12px 12px 0 0">
+    <h3 style="color:#fff;font-size:14px;font-weight:700">GASOLINA</h3>
+    <span style="color:#e3e4f7;font-size:12px">{{ reportes_gasolina|length }} reportes</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr>
+        <th>Fecha</th><th>SEM</th><th>ECO</th><th>Equipo</th><th>Obra</th><th>Operador</th>
+        <th style="text-align:right">Cargado</th>
+        {% if ver_telemetria %}
+        <th style="text-align:right">Telemetría</th>
+        <th style="text-align:right">Faltante</th><th style="text-align:right">Desv.</th>
+        <th>Semáforo</th>
+        {% endif %}
+        <th>Justif.</th>
+        {% if ROLES_ORDEN.get(user.rol,0) >= ROLES_ORDEN.get('supervisor',0) %}<th></th>{% endif %}
+      </tr></thead>
+      <tbody>
+      {% for r in reportes_gasolina %}
+      {% set scol = {'OK':'--ok','Revisar':'--wn','Alerta':'--al','Fraude Probable':'--dg'}.get(r.semaforo, '--mt') %}
+      {% set sbadge = {'OK':'badge-ok','Revisar':'badge-wn','Alerta':'badge-al','Fraude Probable':'badge-dg'}.get(r.semaforo, 'badge-mt') %}
+      <tr>
+        <td style="font-size:11px;color:var(--mt)">{{ r.fecha }}</td>
+        <td style="font-size:11px;font-weight:700;text-align:center">{{ r.semana_num or '—' }}</td>
+        <td><span class="eco">{{ r.codigo_eco }}</span></td>
+        <td style="font-size:11px">{{ r.nombre_equipo or '—' }}</td>
+        <td style="font-size:11px;color:var(--mt)">{{ r.obra_nombre or '—' }}</td>
+        <td style="font-size:11px">{{ r.operador or '—' }}</td>
+        <td style="text-align:right">{{ "%.1f"|format(r.litros_cargados|float) }}</td>
+        {% if ver_telemetria %}
+        <td style="text-align:right;color:var(--mt)">{{ "%.1f"|format(r.litros_telemetria|float) }}</td>
+        <td style="text-align:right;font-weight:700;color:var({{ scol }})">{{ "%.1f"|format(r.litros_faltantes|float) }}</td>
+        <td style="text-align:right;color:var({{ scol }})">{{ "%.1f"|format(r.desviacion_pct|float) }}%</td>
+        <td><span class="badge {{ sbadge }}">{{ r.semaforo }}</span></td>
+        {% endif %}
+        <td>{% if r.justificado %}<span class="badge badge-ok">Sí</span>{% else %}<span class="badge badge-mt">No</span>{% endif %}</td>
+        {% if ROLES_ORDEN.get(user.rol,0) >= ROLES_ORDEN.get('supervisor',0) %}
+        <td><button class="btn btn-secondary btn-sm" onclick="abrirJust({{ r.id }}, {{ r.justificado }}, '{{ (r.observaciones or '')|replace("'","\\'")|replace('\n',' ') }}')">Revisar</button></td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr><td colspan="{{ 13 if ver_telemetria else 9 }}" style="text-align:center;padding:20px;color:var(--mt)">Sin reportes de gasolina</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal justificar -->
+{% if ROLES_ORDEN.get(user.rol,0) >= ROLES_ORDEN.get('supervisor',0) %}
+<div id="modal-just" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:28px;width:100%;max-width:460px">
+    <h3 style="margin-bottom:18px">Revisión de reporte</h3>
+    <form id="formJust" method="POST">
+      <div class="form-group"><label>Estado</label>
+        <select class="form-control" name="justificado" id="just-val">
+          <option value="0">Pendiente / No justificado</option>
+          <option value="1">Justificado</option>
+        </select></div>
+      <div class="form-group"><label>Observaciones / dictamen</label>
+        <textarea class="form-control" name="observaciones" id="just-obs" rows="4" placeholder="Causa de la desviación, evidencia, acción tomada..."></textarea></div>
+      <div style="display:flex;gap:10px">
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <button type="button" onclick="document.getElementById('modal-just').style.display='none'" class="btn btn-secondary">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+function abrirJust(id, just, obs){
+  document.getElementById('formJust').action='/combustible/'+id+'/justificar';
+  document.getElementById('just-val').value=just?'1':'0';
+  document.getElementById('just-obs').value=obs||'';
+  document.getElementById('modal-just').style.display='flex';
+}
+</script>
+{% endif %}
+
+{% if ver_telemetria %}
+<script>
+Chart.defaults.global.defaultFontColor='#7d8590';
+var GRID='rgba(46,49,146,.12)';
+fetch('/api/combustible_tendencia?fecha_ini={{ fi }}&fecha_fin={{ ff }}&obra={{ obr }}&eco={{ eco }}').then(function(r){return r.json()}).then(function(d){
+  new Chart(document.getElementById('grafTend').getContext('2d'),{
+    type:'line',
+    data:{labels:d.map(function(x){return x.fecha?x.fecha.slice(5):''}),
+      datasets:[
+        {label:'Cargado',data:d.map(function(x){return parseFloat(x.cargados)||0}),borderColor:'#3B3F9E',backgroundColor:'rgba(59,63,158,.08)',borderWidth:2,pointRadius:2,fill:false},
+        {label:'Telemetría',data:d.map(function(x){return parseFloat(x.telemetria)||0}),borderColor:'#1c1e5e',backgroundColor:'rgba(28,30,94,.12)',borderWidth:2,pointRadius:2,fill:true},
+        {label:'Faltante',data:d.map(function(x){return parseFloat(x.faltantes)||0}),borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.10)',borderWidth:2,pointRadius:2,fill:false}
+      ]},
+    options:{responsive:true,legend:{display:true,position:'bottom',labels:{boxWidth:12,fontSize:11}},
+      scales:{yAxes:[{ticks:{beginAtZero:true,callback:function(v){return v.toLocaleString()+' L'}},gridLines:{color:GRID}}],xAxes:[{gridLines:{display:false}}]}}
+  });
+});
+</script>
+{% else %}
+<script>
+Chart.defaults.global.defaultFontColor='#7d8590';
+var GRID='rgba(46,49,146,.12)';
+fetch('/api/combustible_tendencia?fecha_ini={{ fi }}&fecha_fin={{ ff }}&obra={{ obr }}&eco={{ eco }}').then(function(r){return r.json()}).then(function(d){
+  new Chart(document.getElementById('grafTend').getContext('2d'),{
+    type:'line',
+    data:{labels:d.map(function(x){return x.fecha?x.fecha.slice(5):''}),
+      datasets:[
+        {label:'Cargado',data:d.map(function(x){return parseFloat(x.cargados)||0}),borderColor:'#3B3F9E',backgroundColor:'rgba(59,63,158,.12)',borderWidth:2,pointRadius:3,fill:true}
+      ]},
+    options:{responsive:true,legend:{display:true,position:'bottom',labels:{boxWidth:12,fontSize:11}},
+      scales:{yAxes:[{ticks:{beginAtZero:true,callback:function(v){return v.toLocaleString()+' L'}},gridLines:{color:GRID}}],xAxes:[{gridLines:{display:false}}]}}
+  });
+});
+</script>
+{% endif %}
+
+<!-- Overlay Importar Excel Combustible -->
+{% if puede_crear %}
+<div id="overlayImportarComb" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#1c1e5e;border:1px solid #2e3192;color:#e3e4f7;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);width:100%;max-width:480px;margin:20px;">
+    <form method="POST" action="{{ url_for('combustible_importar_excel') }}" enctype="multipart/form-data">
+      <div style="border-bottom:1px solid #2e3192;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;">
+        <h5 style="font-weight:600;font-size:16px;margin:0;">📥 Importar Reporte Semanal de Combustible</h5>
+        <button type="button" onclick="document.getElementById('overlayImportarComb').style.display='none'" style="background:none;border:none;color:#e3e4f7;font-size:22px;cursor:pointer;line-height:1;">&times;</button>
+      </div>
+      <div style="padding:20px 24px;">
+        <p style="font-size:13px;color:#a0a3d0;margin-bottom:18px;">
+          Sube el archivo Excel semanal de combustible. El sistema detecta automáticamente las
+          secciones <b style="color:#fff">DIESEL</b> y <b style="color:#fff">GASOLINA</b> sin importar el orden de las hojas o columnas.
+        </p>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:13px;font-weight:500;display:block;margin-bottom:5px;">Obra</label>
+          <select name="id_obra" style="width:100%;padding:8px 12px;background:#161840;border:1px solid #2e3192;color:#e3e4f7;border-radius:6px;" required>
+            <option value="">— Selecciona —</option>
+            {% for o in obras_crear %}
+            <option value="{{ o.id }}" {{ 'selected' if obr|string == o.id|string }}>{{ o.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:13px;font-weight:500;display:block;margin-bottom:5px;">Archivo Excel (.xlsx)</label>
+          <input type="file" name="archivo_excel" style="width:100%;padding:8px;background:#161840;border:1px solid #2e3192;color:#e3e4f7;border-radius:6px;" accept=".xlsx,.xls" required>
+        </div>
+      </div>
+      <div style="border-top:1px solid #2e3192;padding:14px 24px;display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" onclick="document.getElementById('overlayImportarComb').style.display='none'" class="btn btn-secondary">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Importar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

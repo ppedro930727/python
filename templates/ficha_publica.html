@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ficha técnica {{ maq.eco }} — ESMA</title>
+<style>
+  :root{--bg:#eef1f6;--s1:#ffffff;--s2:#f1f3f8;--bd:#dde1e8;--ac:#3B3F9E;--ac2:#262A6E;
+        --tx:#1c2230;--mt:#6b7280;--dg:#dc2626;--wn:#b45309;--al:#c2410c;--ok:#15803d;--r:10px;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:'Segoe UI',system-ui,sans-serif;
+       display:flex;justify-content:center;padding:18px 12px 40px}
+  .wrap{width:100%;max-width:480px}
+  .hd{display:flex;align-items:center;gap:12px;margin-bottom:18px;background:#1a237e;padding:16px 20px;border-radius:10px}
+  .hd img{height:42px}
+  .hd .tt{font-size:13px;color:#fff}
+  .eco-badge{display:inline-block;background:var(--s2);border:1px solid var(--bd);color:var(--ac);
+             font-family:monospace;font-weight:700;font-size:13px;padding:3px 10px;border-radius:6px}
+  h1{font-size:22px;margin:10px 0 2px}
+  .sub{color:var(--mt);font-size:13px;margin-bottom:18px}
+  .card{background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);margin-bottom:14px;overflow:hidden}
+  .card-hd{padding:12px 16px;border-bottom:1px solid var(--bd);font-size:13px;font-weight:700;color:var(--tx)}
+  .card-bd{padding:14px 16px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid .full{grid-column:1 / -1}
+  .field label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mt);margin-bottom:3px}
+  .field .val{font-size:14px;font-weight:600}
+  .sem-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .dot{width:12px;height:12px;border-radius:50%;display:inline-block;flex-shrink:0}
+  .bar{background:var(--bd);border-radius:4px;height:8px;overflow:hidden;margin-bottom:10px}
+  .bar-fill{height:100%}
+  .hist-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd);font-size:12px}
+  .hist-item:last-child{border-bottom:none}
+  .hist-item .desc{color:var(--mt);font-size:11px;margin-top:2px}
+  .foot{text-align:center;color:var(--mt);font-size:11px;margin-top:24px}
+  a{color:var(--ac)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hd">
+    <img src="{{ logo_path }}" onerror="this.style.display='none'">
+    <div class="tt">Plataforma de Telemetría<br>Ficha técnica de equipo</div>
+  </div>
+
+  <span class="eco-badge">{{ maq.eco }}</span>
+  <h1>{{ maq.nombre_equipo }}</h1>
+  <div class="sub">{{ maq.marca }} {{ maq.modelo }}{% if maq.anio %} · {{ maq.anio }}{% endif %}</div>
+
+  <div class="card">
+    <div class="card-hd">Datos técnicos</div>
+    <div class="card-bd">
+      <div class="grid">
+        <div class="field"><label>Marca</label><div class="val">{{ maq.marca or '—' }}</div></div>
+        <div class="field"><label>Modelo</label><div class="val">{{ maq.modelo or '—' }}</div></div>
+        <div class="field"><label>Número de serie</label><div class="val">{{ maq.serie or '—' }}</div></div>
+        <div class="field"><label>Año</label><div class="val">{{ maq.anio or '—' }}</div></div>
+        <div class="field"><label>Clasificación</label><div class="val">{{ maq.clasificacion or '—' }}</div></div>
+        <div class="field"><label>Proveedor</label><div class="val">{{ maq.proveedor or '—' }}</div></div>
+        {% if user %}
+        <div class="field full"><label>Obra asignada</label><div class="val">{{ maq.obra_nombre or 'Sin asignar' }}</div></div>
+        <div class="field full"><label>Ubicación</label><div class="val">{{ maq.ubicacion or '—' }}</div></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd">Horómetro y mantenimiento</div>
+    <div class="card-bd">
+      <div class="grid" style="margin-bottom:14px">
+        <div class="field"><label>Horómetro actual</label>
+          <div class="val">{{ "%.1f"|format(maq.horas_totales_horometro|float) if maq.horas_totales_horometro is not none else '—' }} h</div>
+        </div>
+        <div class="field"><label>Última actualización</label>
+          <div class="val" style="font-size:12px">{{ maq.fecha_ultima_actualizacion or '—' }}</div>
+        </div>
+      </div>
+
+      {% if sem_mant.sin_dato %}
+        <div style="color:var(--mt);font-size:12px">Sin lecturas de horómetro disponibles.</div>
+      {% else %}
+        {% set color = '#ef4444' if sem_mant.nivel=='vencido' else ('#f97316' if sem_mant.nivel=='proximo' else ('#f59e0b' if sem_mant.nivel=='atencion' else '#22c55e')) %}
+        {% set texto = 'Mantenimiento vencido' if sem_mant.nivel=='vencido' else ('Próximo mantenimiento' if sem_mant.nivel=='proximo' else ('Atención' if sem_mant.nivel=='atencion' else 'En regla')) %}
+        <div class="sem-row">
+          <span class="dot" style="background:{{ color }}"></span>
+          <span style="font-weight:700;color:{{ color }}">{{ texto }}</span>
+        </div>
+        <div class="bar"><div class="bar-fill" style="width:{{ sem_mant.pct }}%;background:{{ color }}"></div></div>
+        <div style="font-size:12px;color:var(--mt)">
+          {% if sem_mant.nivel == 'vencido' %}
+            {{ sem_mant.horas_restantes|abs }} h excedidas del intervalo de 250 h.
+          {% else %}
+            Faltan {{ sem_mant.horas_restantes }} h para el próximo mantenimiento (cada 250 h).
+          {% endif %}
+        </div>
+        {% if ultimo_mant %}
+        <div style="margin-top:10px;font-size:12px;color:var(--mt)">
+          Último mantenimiento: <strong style="color:var(--tx)">{{ ultimo_mant.fecha }} {{ ultimo_mant.hora }}</strong>
+          ({{ "%.1f"|format(ultimo_mant.horometro|float) }} h)
+        </div>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {% if mantenimientos %}
+  <div class="card">
+    <div class="card-hd">Historial de mantenimientos</div>
+    <div class="card-bd" style="padding-top:4px">
+      {% for mt in mantenimientos[:5] %}
+      <div class="hist-item">
+        <div>
+          <div>{{ mt.fecha }} {{ mt.hora }}</div>
+          <div class="desc">{{ mt.descripcion or 'Sin descripción' }}</div>
+        </div>
+        <div style="white-space:nowrap;font-weight:600">{{ "%.1f"|format(mt.horometro|float) }} h</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="foot">GRUPO ESMA · Plataforma de Telemetría<br>Ficha generada automáticamente — solo lectura</div>
+</div>
+</body>
+</html>

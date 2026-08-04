@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Remisiones — ESMA{% endblock %}
+{% block page_title %}Planta de Asfalto · Remisiones de suministro{% endblock %}
+{% block breadcrumb %}Base real para conciliar el pago de asfalto/emulsión al proveedor{% endblock %}
+{% block topbar_actions %}
+{% if ROLES_ORDEN.get(user.rol,0) >= ROLES_ORDEN.get('reportes',0) %}
+<a href="{{ url_for('planta_remision_nueva', obra=obr) }}" class="btn btn-primary">+ Nueva remisión</a>
+{% endif %}
+{% endblock %}
+{% block content %}
+<div class="card"><div class="card-bd">
+  <form method="GET" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+    <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Obra</label>
+      <select class="form-control" name="obra" onchange="this.form.submit()">
+        {% for o in obras %}<option value="{{ o.id }}" {{ 'selected' if obr==o.id|string }}>{{ o.nombre }}</option>{% endfor %}
+      </select></div>
+    <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Producto</label>
+      <select class="form-control" name="producto" onchange="this.form.submit()">
+        <option value="">Todos</option>
+        <option value="asfalto" {{ 'selected' if prod=='asfalto' }}>Asfalto</option>
+        <option value="emulsion" {{ 'selected' if prod=='emulsion' }}>Emulsión</option>
+      </select></div>
+    <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Desde</label>
+      <input class="form-control" type="date" name="fecha_ini" value="{{ fi }}"></div>
+    <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Hasta</label>
+      <input class="form-control" type="date" name="fecha_fin" value="{{ ff }}"></div>
+    <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+  </form>
+</div></div>
+
+<div class="r360-tabs">
+  <a href="{{ url_for('planta', obra=obr) }}" class="r360-tab">🛢 Producción</a>
+  <a href="{{ url_for('planta_avance', obra=obr) }}" class="r360-tab">📏 Avance Físico</a>
+  <a href="{{ url_for('planta_remisiones', obra=obr) }}" class="r360-tab active">🚛 Remisiones</a>
+</div>
+
+<div class="card">
+  <div class="card-hd"><h3>Remisiones — envío vs. recibido</h3>
+    <a href="{{ url_for('planta_exportar_excel', seccion='remisiones', obra=obr, producto=prod) }}" class="btn btn-secondary btn-sm">↓ Excel</a>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr><th>Llegada</th><th>Salida</th><th>Producto</th><th>Proveedor</th>
+        <th>Remisión</th><th>Certificado</th><th>Neto envío (tn)</th><th>Neto recibo (tn)</th>
+        <th>Diferencia</th><th>Monto ($)</th><th>Acum. (tn)</th></tr></thead>
+      <tbody>
+        {% for r in remisiones %}
+        <tr>
+          <td>{{ r.fecha_llegada or '—' }}</td><td>{{ r.fecha_salida or '—' }}</td>
+          <td>{{ 'Asfalto' if r.producto=='asfalto' else 'Emulsión' }}</td>
+          <td>{{ r.proveedor or '—' }}</td><td>{{ r.remision or '—' }}</td>
+          <td>{{ r.certificado or '—' }}</td>
+          <td>{{ r.peso_neto_envio_calc if r.peso_neto_envio_calc else (r.peso_neto_envio or '—') }}</td>
+          <td>{{ r.peso_neto_recibo }}</td>
+          <td>{% if r.merma %}<span class="badge badge-dg">{{ r.diferencia }}</span>{% else %}<span class="badge badge-ok">{{ r.diferencia }}</span>{% endif %}</td>
+          <td>{{ "${:,.2f}".format(r.monto) if r.monto else '—' }}</td>
+          <td style="font-weight:700">{{ r.tn_acumuladas }}</td>
+        </tr>
+        {% else %}<tr><td colspan="11" style="text-align:center;padding:18px;color:var(--mt)">Sin remisiones capturadas.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

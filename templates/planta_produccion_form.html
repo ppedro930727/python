@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Nuevo registro de producción — ESMA{% endblock %}
+{% block page_title %}Planta de Asfalto · Nuevo registro de producción{% endblock %}
+{% block breadcrumb %}Solo captura Fecha, Descarga/Recibido y Final medido — lo demás se calcula solo{% endblock %}
+{% block content %}
+<div class="card"><div class="card-bd">
+  <form method="POST">
+    <input type="hidden" name="id_obra" value="{{ obr }}">
+    <div class="row">
+      <div class="col form-group" style="min-width:160px"><label>Obra</label>
+        <select class="form-control" name="id_obra">
+          {% for o in obras %}<option value="{{ o.id }}" {{ 'selected' if obr==o.id|string }}>{{ o.nombre }}</option>{% endfor %}
+        </select></div>
+      <div class="col form-group" style="min-width:150px"><label>Fecha</label>
+        <input class="form-control" type="date" name="fecha" value="{{ hoy }}" required></div>
+      <div class="col form-group" style="min-width:150px"><label>Material</label>
+        <select class="form-control" name="material">
+          <option>Carpeta</option><option>Base</option><option>Micro</option></select></div>
+      <div class="col form-group" style="min-width:120px"><label># Camiones</label>
+        <input class="form-control" type="number" step="1" name="num_camiones"></div>
+      <div class="col form-group" style="min-width:120px"><label>Vol. producido (m³)</label>
+        <input class="form-control" type="number" step="0.01" name="vol_m3"></div>
+    </div>
+
+    <div class="card" style="margin-top:8px"><div class="card-hd"><h3>🛢 Asfalto</h3></div><div class="card-bd row">
+      <div class="col form-group"><label>Inicial (lt) <span style="color:var(--mt)">— auto si se deja vacío</span></label>
+        <input class="form-control" type="number" step="0.01" name="asf_ini"></div>
+      <div class="col form-group"><label>Descarga recibida (lt)</label>
+        <input class="form-control" type="number" step="0.01" name="asf_desc"></div>
+      <div class="col form-group"><label>Final medido (lt)</label>
+        <input class="form-control" type="number" step="0.01" name="asf_final"></div>
+    </div></div>
+
+    <div class="card" style="margin-top:8px"><div class="card-hd"><h3>⛽ Combustible alterno</h3></div><div class="card-bd row">
+      <div class="col form-group"><label>Inicial (lt)</label>
+        <input class="form-control" type="number" step="0.01" name="alt_ini"></div>
+      <div class="col form-group"><label>Descarga recibida (lt)</label>
+        <input class="form-control" type="number" step="0.01" name="alt_desc"></div>
+      <div class="col form-group"><label>Final medido (lt)</label>
+        <input class="form-control" type="number" step="0.01" name="alt_final"></div>
+    </div></div>
+
+    <div class="card" style="margin-top:8px"><div class="card-hd"><h3>💧 Emulsión</h3></div><div class="card-bd row">
+      <div class="col form-group"><label>Inicial (lt)</label>
+        <input class="form-control" type="number" step="0.01" name="emu_ini"></div>
+      <div class="col form-group"><label>Descarga recibida (lt)</label>
+        <input class="form-control" type="number" step="0.01" name="emu_desc"></div>
+      <div class="col form-group"><label>Final medido (lt)</label>
+        <input class="form-control" type="number" step="0.01" name="emu_final"></div>
+    </div></div>
+
+    <div class="card" style="margin-top:8px"><div class="card-hd"><h3>🪨 Pétreos — grava y arena</h3></div><div class="card-bd row">
+      <div class="col form-group"><label>Grava recibida hoy (m³)</label>
+        <input class="form-control" type="number" step="0.01" name="grava_recib"></div>
+      <div class="col form-group"><label>Arena recibida hoy (m³)</label>
+        <input class="form-control" type="number" step="0.01" name="arena_recib"></div>
+      <div class="col" style="align-self:center;font-size:12px;color:var(--mt)">
+        El consumo de grava/arena se calcula solo: Vol. m³ × factor de Config. El stock final = inicial + recibido − consumo.</div>
+    </div></div>
+
+    <div style="margin-top:16px">
+      <button class="btn btn-primary" type="submit">Guardar registro</button>
+      <a href="{{ url_for('planta', obra=obr) }}" class="btn btn-secondary">Cancelar</a>
+    </div>
+  </form>
+</div></div>
+{% endblock %}

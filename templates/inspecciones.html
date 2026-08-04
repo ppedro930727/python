@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Inspecciones — ESMA{% endblock %}
+{% block page_title %}Inspecciones{% endblock %}
+{% block breadcrumb %}Administración de proyectos · Inspecciones de campo{% endblock %}
+{% block topbar_actions %}
+{% if ROLES_ORDEN.get(user.rol,0) >= ROLES_ORDEN.get('reportes',0) %}
+<a href="{{ url_for('inspeccion_nueva') }}" class="btn btn-primary">+ Nueva inspección</a>
+{% endif %}
+{% endblock %}
+{% block content %}
+<div class="card" style="margin-bottom:16px"><div class="card-bd">
+  <form method="GET" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+    <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Desde</label>
+      <input class="form-control" type="date" name="fecha_ini" value="{{ fi }}"></div>
+    <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Hasta</label>
+      <input class="form-control" type="date" name="fecha_fin" value="{{ ff }}"></div>
+    <div><label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Resultado</label>
+      <select class="form-control" name="resultado">
+        <option value="">Todos</option>
+        {% for r in ['conforme','observaciones','no_conforme'] %}
+        <option value="{{ r }}" {{ 'selected' if res==r }}>{{ r|replace('_',' ')|capitalize }}</option>{% endfor %}
+      </select></div>
+    <button type="submit" class="btn btn-primary">Filtrar</button>
+    <a href="{{ url_for('inspecciones') }}" class="btn btn-secondary">Limpiar</a>
+  </form>
+</div></div>
+
+<div class="card">
+  <div class="card-hd"><h3>{{ inspecciones|length }} inspecciones</h3></div>
+  <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr><th>Folio</th><th>Fecha</th><th>ECO</th><th>Obra</th><th>Inspector</th><th>Tipo</th><th>Resultado</th><th>Severidad</th><th>Hallazgos</th></tr></thead>
+      <tbody>
+      {% for i in inspecciones %}
+      {% set rb = {'conforme':'badge-ok','observaciones':'badge-wn','no_conforme':'badge-dg'}.get(i.resultado,'badge-mt') %}
+      {% set sb = {'bajo':'badge-ok','medio':'badge-wn','alto':'badge-al','critico':'badge-dg'}.get(i.severidad,'badge-mt') %}
+      <tr>
+        <td><span class="eco">{{ i.folio }}</span></td>
+        <td style="font-size:11px;color:var(--mt)">{{ i.fecha }}</td>
+        <td>{% if i.codigo_eco %}<span class="eco">{{ i.codigo_eco }}</span>{% else %}—{% endif %}</td>
+        <td style="font-size:11px;color:var(--mt)">{{ i.obra_nombre or '—' }}</td>
+        <td style="font-size:11px">{{ i.inspector or '—' }}</td>
+        <td style="font-size:11px">{{ i.tipo }}</td>
+        <td><span class="badge {{ rb }}">{{ i.resultado|replace('_',' ') }}</span></td>
+        <td><span class="badge {{ sb }}">{{ i.severidad }}</span></td>
+        <td style="font-size:11px;color:var(--mt);max-width:260px">{{ i.hallazgos or '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9" style="text-align:center;padding:30px;color:var(--mt)">Sin inspecciones en el periodo</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
