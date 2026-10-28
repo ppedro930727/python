@@ -6,3 +6,4 @@ requests
 eventlet
 xhtml2pdf
 qrcode[pil]
+opencv-python-headless
